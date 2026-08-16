@@ -12,6 +12,18 @@ const TAB_LABELS = {
   restrooms: 'Restrooms',
   registrations: 'Registrations'
 };
+const GROUP_DSPS = [
+  '1000Fix',
+  'Inbox',
+  'Softlogic',
+  'CTC',
+  'Digipro',
+  'NCR',
+  'SOG',
+  'Getronics',
+  'SVOA',
+  'ISS'
+].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 
 function TabButton({ active, onClick, label }) {
   return (
@@ -174,11 +186,19 @@ export default function AdminDashboardPage() {
   };
 
   const addGroup = () => {
-    setGroups([...groups, { id: `${Date.now()}`, dsp: '', group: '' }]);
+    const used = new Set(groups.map((g) => g.dsp));
+    const nextDsp = GROUP_DSPS.find((d) => !used.has(d));
+    if (!nextDsp) return;
+    setGroups([...groups, { id: `${Date.now()}`, dsp: nextDsp, group: '' }]);
   };
 
   const updateGroup = (id, field, value) => {
     setGroups(groups.map((g) => (g.id === id ? { ...g, [field]: value } : g)));
+  };
+
+  const availableDsps = (id) => {
+    const used = new Set(groups.filter((g) => g.id !== id).map((g) => g.dsp));
+    return GROUP_DSPS.filter((d) => !used.has(d));
   };
 
   const toggleGroup = (id) => {
@@ -415,7 +435,7 @@ export default function AdminDashboardPage() {
           <div className="flex gap-2 mb-3">
             <button
               onClick={addGroup}
-              disabled={status.saving}
+              disabled={status.saving || !GROUP_DSPS.some((d) => !groups.some((g) => g.dsp === d))}
               className="bg-brand text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
             >
               Add DSP
@@ -457,12 +477,19 @@ export default function AdminDashboardPage() {
                         />
                       </td>
                       <td className="p-3">
-                        <input
+                        <select
                           value={g.dsp}
                           onChange={(e) => updateGroup(g.id, 'dsp', e.target.value)}
-                          className="w-full border rounded px-2 py-1"
-                          placeholder="DSP"
-                        />
+                          className="w-full border rounded px-2 py-1 bg-white"
+                        >
+                          {(() => {
+                            const options = availableDsps(g.id);
+                            if (g.dsp && !options.includes(g.dsp)) options.unshift(g.dsp);
+                            return options.map((d) => (
+                              <option key={d} value={d}>{d}</option>
+                            ));
+                          })()}
+                        </select>
                       </td>
                       <td className="p-3">
                         <input

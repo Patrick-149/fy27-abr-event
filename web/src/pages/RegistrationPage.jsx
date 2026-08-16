@@ -2,7 +2,18 @@ import { useState } from 'react';
 import api from '../api';
 import FormInput from '../components/FormInput';
 
-const DSPS = ['1000Fix', 'CTC', 'Digipro', 'Inbox', 'ISS', 'NCR', 'Soft Logic', 'SOG', 'SVOA'];
+const DSPS = [
+  '1000Fix',
+  'CTC',
+  'Digipro',
+  'Getronics',
+  'Inbox',
+  'ISS',
+  'NCR',
+  'SOG',
+  'Soft Logic',
+  'SVOA'
+].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 
 export default function RegistrationPage() {
   const [form, setForm] = useState({
