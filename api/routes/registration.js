@@ -10,10 +10,11 @@ router.post('/', async (req, res, next) => {
       return res.status(400).json({ message: 'All fields are required' });
     }
     const collection = getRegistrationsCollection();
-    const entry = { fullName, email, country, dsp, createdAt: new Date() };
-    const { insertedId } = await collection.insertOne(entry);
     const groupDoc = await getGroupsCollection().findOne({ dsp });
-    res.status(201).json({ success: true, id: insertedId.toString(), group: groupDoc?.group || null });
+    const group = groupDoc?.group || '';
+    const entry = { fullName, email, country, dsp, group, createdAt: new Date() };
+    const { insertedId } = await collection.insertOne(entry);
+    res.status(201).json({ success: true, id: insertedId.toString(), group });
   } catch (err) {
     next(err);
   }

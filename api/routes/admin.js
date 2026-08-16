@@ -103,18 +103,14 @@ router.put('/poc', authenticate, requireAdmin, putData('poc.json'));
 router.get('/registrations', authenticate, requireAdmin, async (req, res, next) => {
   try {
     const collection = getRegistrationsCollection();
-    const [registrations, groups] = await Promise.all([
-      collection.find().sort({ createdAt: -1 }).toArray(),
-      getGroupsCollection().find().toArray()
-    ]);
-    const groupMap = new Map(groups.map((g) => [g.dsp, g.group]));
+    const registrations = await collection.find().sort({ createdAt: -1 }).toArray();
     res.json(registrations.map((r) => ({
       id: r._id.toString(),
       fullName: r.fullName,
       email: r.email,
       country: r.country,
       dsp: r.dsp,
-      group: groupMap.get(r.dsp) || '',
+      group: r.group || '',
       createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt
     })));
   } catch (err) {
@@ -130,6 +126,7 @@ router.get('/registrations/export', authenticate, requireAdmin, async (req, res,
       'Email': r.email,
       'Country': r.country,
       'DSP': r.dsp,
+      'Group': r.group || '',
       'Submitted At': r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt
     }));
     const worksheet = xlsx.utils.json_to_sheet(rows);
@@ -162,15 +159,26 @@ router.put('/groups', authenticate, requireAdmin, async (req, res, next) => {
     const items = Array.isArray(req.body) ? req.body : [req.body];
     const valid = items.filter((item) => item.dsp && item.group);
     const collection = getGroupsCollection();
+    const registrationsCollection = getRegistrationsCollection();
     for (const item of valid) {
+      const dsp = item.dsp.trim();
+      const group = item.group.trim();
       await collection.updateOne(
-        { dsp: item.dsp.trim() },
-        { $set: { group: item.group.trim() } },
+        { dsp },
+        { $set: { group } },
         { upsert: true }
+      );
+      await registrationsCollection.updateMany(
+        { dsp },
+        { $set: { group } }
       );
     }
     const dspSet = new Set(valid.map((item) => item.dsp.trim()));
     await collection.deleteMany({ dsp: { $nin: [...dspSet] } });
+    await registrationsCollection.updateMany(
+      { dsp: { $nin: [...dspSet] } },
+      { $set: { group: '' } }
+    );
     res.json({ success: true });
   } catch (err) {
     next(err);

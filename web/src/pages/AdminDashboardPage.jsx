@@ -158,8 +158,16 @@ export default function AdminDashboardPage() {
     save('/api/admin/poc', poc);
   };
 
-  const saveGroups = () => {
-    save('/api/admin/groups', groups);
+  const saveGroups = async () => {
+    setStatus({ saving: true, message: '', error: '' });
+    try {
+      await api.put('/api/admin/groups', groups);
+      const { data } = await api.get('/api/admin/registrations');
+      setRegistrations(data);
+      setStatus({ saving: false, message: 'Saved successfully.', error: '' });
+    } catch {
+      setStatus({ saving: false, message: '', error: 'Save failed.' });
+    }
   };
 
   if (loading) return <Loading />;
