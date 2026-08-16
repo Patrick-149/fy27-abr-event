@@ -26,11 +26,14 @@ export default function RegistrationPage() {
     e.preventDefault();
     setStatus({ loading: true, error: '', success: '' });
     try {
-      await api.post('/api/register', form);
+      const { data } = await api.post('/api/register', form);
+      const groupText = data.group
+        ? `You belong to group: ${data.group}`
+        : 'Your group will be assigned by the admin soon.';
       setStatus({
         loading: false,
         error: '',
-        success: 'Registration submitted successfully!'
+        success: `Registration submitted successfully! ${groupText}`
       });
       setForm({ fullName: '', email: '', country: '', dsp: '' });
     } catch {

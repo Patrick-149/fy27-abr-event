@@ -3,7 +3,15 @@ import api from '../api';
 import EditableList from '../components/EditableList';
 import Loading from '../components/Loading';
 
-const TABS = ['schedule', 'restaurant', 'poc', 'registrations'];
+const TABS = ['schedule', 'restaurant', 'poc', 'groups', 'registrations'];
+const TAB_LABELS = {
+  schedule: 'Schedule',
+  restaurant: 'Restaurant',
+  poc: 'POC Contact',
+  groups: 'Groups',
+  restrooms: 'Restrooms',
+  registrations: 'Registrations'
+};
 
 function TabButton({ active, onClick, label }) {
   return (
@@ -33,6 +41,7 @@ export default function AdminDashboardPage() {
   const [restrooms, setRestrooms] = useState([]);
   const [poc, setPoc] = useState([]);
   const [registrations, setRegistrations] = useState([]);
+  const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({ saving: false, message: '', error: '' });
   const [uploadFile, setUploadFile] = useState(null);
@@ -41,11 +50,12 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [s, r, rr, p, reg] = await Promise.all([
+        const [s, r, rr, p, g, reg] = await Promise.all([
           api.get('/api/admin/schedule'),
           api.get('/api/admin/restaurant'),
           api.get('/api/admin/restrooms'),
           api.get('/api/admin/poc'),
+          api.get('/api/admin/groups'),
           api.get('/api/admin/registrations')
         ]);
         setSchedule(s.data);
@@ -59,6 +69,7 @@ export default function AdminDashboardPage() {
         });
         setRestrooms(rr.data);
         setPoc(p.data);
+        setGroups(g.data);
         setRegistrations(reg.data);
       } catch {
         setStatus({ saving: false, message: '', error: 'Failed to load admin data.' });
@@ -147,6 +158,10 @@ export default function AdminDashboardPage() {
     save('/api/admin/poc', poc);
   };
 
+  const saveGroups = () => {
+    save('/api/admin/groups', groups);
+  };
+
   if (loading) return <Loading />;
 
   return (
@@ -164,7 +179,7 @@ export default function AdminDashboardPage() {
             key={t}
             active={tab === t}
             onClick={() => setTab(t)}
-            label={t === 'poc' ? 'POC Contact' : t[0].toUpperCase() + t.slice(1)}
+            label={TAB_LABELS[t] || t[0].toUpperCase() + t.slice(1)}
           />
         ))}
       </div>
@@ -307,6 +322,29 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
+      {tab === 'groups' && (
+        <div>
+          <p className="text-sm text-gray-600 mb-2">
+            Assign a group to each DSP. Registrations will show the group that matches their DSP.
+          </p>
+          <EditableList
+            items={groups}
+            onChange={setGroups}
+            fields={[
+              { key: 'dsp', label: 'DSP' },
+              { key: 'group', label: 'Group' }
+            ]}
+          />
+          <button
+            onClick={saveGroups}
+            disabled={status.saving}
+            className="mt-4 w-full bg-brand text-white py-2 rounded-lg font-semibold disabled:opacity-50"
+          >
+            {status.saving ? 'Saving...' : 'Save Groups'}
+          </button>
+        </div>
+      )}
+
       {tab === 'registrations' && (
         <div>
           <div className="flex justify-end mb-3">
@@ -329,6 +367,7 @@ export default function AdminDashboardPage() {
                     <th className="p-3">Email</th>
                     <th className="p-3">Country</th>
                     <th className="p-3">DSP</th>
+                    <th className="p-3">Group</th>
                     <th className="p-3">Submitted At</th>
                   </tr>
                 </thead>
@@ -339,6 +378,7 @@ export default function AdminDashboardPage() {
                       <td className="p-3">{r.email}</td>
                       <td className="p-3">{r.country}</td>
                       <td className="p-3">{r.dsp}</td>
+                      <td className="p-3">{r.group || '-'}</td>
                       <td className="p-3">{new Date(r.createdAt).toLocaleString()}</td>
                     </tr>
                   ))}

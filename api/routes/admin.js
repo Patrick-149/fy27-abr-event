@@ -5,7 +5,7 @@ import multer from 'multer';
 import xlsx from 'xlsx';
 import { authenticate, requireAdmin } from '../auth.js';
 import { readJson, writeJson } from '../utils.js';
-import { getRegistrationsCollection } from '../db.js';
+import { getRegistrationsCollection, getGroupsCollection } from '../db.js';
 
 const router = Router();
 
@@ -103,13 +103,18 @@ router.put('/poc', authenticate, requireAdmin, putData('poc.json'));
 router.get('/registrations', authenticate, requireAdmin, async (req, res, next) => {
   try {
     const collection = getRegistrationsCollection();
-    const registrations = await collection.find().sort({ createdAt: -1 }).toArray();
+    const [registrations, groups] = await Promise.all([
+      collection.find().sort({ createdAt: -1 }).toArray(),
+      getGroupsCollection().find().toArray()
+    ]);
+    const groupMap = new Map(groups.map((g) => [g.dsp, g.group]));
     res.json(registrations.map((r) => ({
       id: r._id.toString(),
       fullName: r.fullName,
       email: r.email,
       country: r.country,
       dsp: r.dsp,
+      group: groupMap.get(r.dsp) || '',
       createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt
     })));
   } catch (err) {
@@ -134,6 +139,39 @@ router.get('/registrations/export', authenticate, requireAdmin, async (req, res,
     res.setHeader('Content-Disposition', 'attachment; filename="registrations.xlsx"');
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.send(buffer);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/groups', authenticate, requireAdmin, async (req, res, next) => {
+  try {
+    const groups = await getGroupsCollection().find().toArray();
+    res.json(groups.map((g) => ({
+      id: g._id.toString(),
+      dsp: g.dsp,
+      group: g.group
+    })));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put('/groups', authenticate, requireAdmin, async (req, res, next) => {
+  try {
+    const items = Array.isArray(req.body) ? req.body : [req.body];
+    const valid = items.filter((item) => item.dsp && item.group);
+    const collection = getGroupsCollection();
+    for (const item of valid) {
+      await collection.updateOne(
+        { dsp: item.dsp.trim() },
+        { $set: { group: item.group.trim() } },
+        { upsert: true }
+      );
+    }
+    const dspSet = new Set(valid.map((item) => item.dsp.trim()));
+    await collection.deleteMany({ dsp: { $nin: [...dspSet] } });
+    res.json({ success: true });
   } catch (err) {
     next(err);
   }

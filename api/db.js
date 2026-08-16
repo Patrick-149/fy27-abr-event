@@ -29,6 +29,11 @@ export function getRegistrationsCollection() {
   return db.collection('registrations');
 }
 
+export function getGroupsCollection() {
+  if (!db) throw new Error('Database not connected');
+  return db.collection('groups');
+}
+
 export async function closeDb() {
   if (client) await client.close();
 }
