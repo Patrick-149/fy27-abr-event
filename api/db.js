@@ -20,6 +20,13 @@ export async function connectDb() {
 
   await client.connect();
   db = client.db('fy27abr');
+  for (const name of ['registrations', 'groups']) {
+    try {
+      await db.createCollection(name);
+    } catch (err) {
+      if (err.code !== 48) throw err;
+    }
+  }
   console.log('Connected to MongoDB');
   return db;
 }
