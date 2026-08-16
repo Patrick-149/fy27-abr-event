@@ -41,7 +41,9 @@ export default function AdminDashboardPage() {
   const [restrooms, setRestrooms] = useState([]);
   const [poc, setPoc] = useState([]);
   const [registrations, setRegistrations] = useState([]);
+  const [selectedRegistrationIds, setSelectedRegistrationIds] = useState(new Set());
   const [groups, setGroups] = useState([]);
+  const [selectedGroupIds, setSelectedGroupIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({ saving: false, message: '', error: '' });
   const [uploadFile, setUploadFile] = useState(null);
@@ -164,9 +166,84 @@ export default function AdminDashboardPage() {
       await api.put('/api/admin/groups', groups);
       const { data } = await api.get('/api/admin/registrations');
       setRegistrations(data);
+      setSelectedGroupIds(new Set());
       setStatus({ saving: false, message: 'Saved successfully.', error: '' });
     } catch {
       setStatus({ saving: false, message: '', error: 'Save failed.' });
+    }
+  };
+
+  const addGroup = () => {
+    setGroups([...groups, { id: `${Date.now()}`, dsp: '', group: '' }]);
+  };
+
+  const updateGroup = (id, field, value) => {
+    setGroups(groups.map((g) => (g.id === id ? { ...g, [field]: value } : g)));
+  };
+
+  const toggleGroup = (id) => {
+    const next = new Set(selectedGroupIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedGroupIds(next);
+  };
+
+  const toggleAllGroups = () => {
+    if (selectedGroupIds.size === groups.length) {
+      setSelectedGroupIds(new Set());
+    } else {
+      setSelectedGroupIds(new Set(groups.map((g) => g.id)));
+    }
+  };
+
+  const removeSelectedGroups = async () => {
+    if (selectedGroupIds.size === 0) return;
+    const count = selectedGroupIds.size;
+    if (!window.confirm(`Are you sure you want to remove ${count} group mapping(s)?`)) return;
+    setStatus({ saving: true, message: '', error: '' });
+    try {
+      const ids = Array.from(selectedGroupIds);
+      await api.delete('/api/admin/groups', { data: { ids } });
+      const { data } = await api.get('/api/admin/groups');
+      setGroups(data);
+      const { data: regData } = await api.get('/api/admin/registrations');
+      setRegistrations(regData);
+      setSelectedGroupIds(new Set());
+      setStatus({ saving: false, message: 'Removed successfully.', error: '' });
+    } catch {
+      setStatus({ saving: false, message: '', error: 'Remove failed.' });
+    }
+  };
+
+  const toggleRegistration = (id) => {
+    const next = new Set(selectedRegistrationIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedRegistrationIds(next);
+  };
+
+  const toggleAllRegistrations = () => {
+    if (selectedRegistrationIds.size === registrations.length) {
+      setSelectedRegistrationIds(new Set());
+    } else {
+      setSelectedRegistrationIds(new Set(registrations.map((r) => r.id)));
+    }
+  };
+
+  const removeSelectedRegistrations = async () => {
+    if (selectedRegistrationIds.size === 0) return;
+    const count = selectedRegistrationIds.size;
+    if (!window.confirm(`Are you sure you want to remove ${count} registration(s)?`)) return;
+    setStatus({ saving: true, message: '', error: '' });
+    try {
+      const ids = Array.from(selectedRegistrationIds);
+      await api.delete('/api/admin/registrations', { data: { ids } });
+      const { data } = await api.get('/api/admin/registrations');
+      setRegistrations(data);
+      setSelectedRegistrationIds(new Set());
+      setStatus({ saving: false, message: 'Removed successfully.', error: '' });
+    } catch {
+      setStatus({ saving: false, message: '', error: 'Remove failed.' });
     }
   };
 
@@ -335,18 +412,76 @@ export default function AdminDashboardPage() {
           <p className="text-sm text-gray-600 mb-2">
             Assign a group to each DSP. Registrations will show the group that matches their DSP.
           </p>
-          <EditableList
-            items={groups}
-            onChange={setGroups}
-            fields={[
-              { key: 'dsp', label: 'DSP' },
-              { key: 'group', label: 'Group' }
-            ]}
-          />
+          <div className="flex gap-2 mb-3">
+            <button
+              onClick={addGroup}
+              disabled={status.saving}
+              className="bg-brand text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
+            >
+              Add DSP
+            </button>
+            <button
+              onClick={removeSelectedGroups}
+              disabled={status.saving || selectedGroupIds.size === 0}
+              className="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
+            >
+              Remove Selected
+            </button>
+          </div>
+          <div className="bg-white rounded-xl shadow overflow-hidden mb-4">
+            {groups.length === 0 ? (
+              <p className="p-4 text-gray-500">No group mappings yet.</p>
+            ) : (
+              <table className="w-full text-sm text-left">
+                <thead className="bg-gray-100 text-gray-700">
+                  <tr>
+                    <th className="p-3 w-10">
+                      <input
+                        type="checkbox"
+                        checked={groups.length > 0 && selectedGroupIds.size === groups.length}
+                        onChange={toggleAllGroups}
+                      />
+                    </th>
+                    <th className="p-3">DSP</th>
+                    <th className="p-3">Group</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {groups.map((g) => (
+                    <tr key={g.id} className="border-t">
+                      <td className="p-3 w-10">
+                        <input
+                          type="checkbox"
+                          checked={selectedGroupIds.has(g.id)}
+                          onChange={() => toggleGroup(g.id)}
+                        />
+                      </td>
+                      <td className="p-3">
+                        <input
+                          value={g.dsp}
+                          onChange={(e) => updateGroup(g.id, 'dsp', e.target.value)}
+                          className="w-full border rounded px-2 py-1"
+                          placeholder="DSP"
+                        />
+                      </td>
+                      <td className="p-3">
+                        <input
+                          value={g.group}
+                          onChange={(e) => updateGroup(g.id, 'group', e.target.value)}
+                          className="w-full border rounded px-2 py-1"
+                          placeholder="Group"
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
           <button
             onClick={saveGroups}
             disabled={status.saving}
-            className="mt-4 w-full bg-brand text-white py-2 rounded-lg font-semibold disabled:opacity-50"
+            className="w-full bg-brand text-white py-2 rounded-lg font-semibold disabled:opacity-50"
           >
             {status.saving ? 'Saving...' : 'Save Groups'}
           </button>
@@ -355,7 +490,14 @@ export default function AdminDashboardPage() {
 
       {tab === 'registrations' && (
         <div>
-          <div className="flex justify-end mb-3">
+          <div className="flex justify-end gap-2 mb-3">
+            <button
+              onClick={removeSelectedRegistrations}
+              disabled={status.saving || selectedRegistrationIds.size === 0}
+              className="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
+            >
+              Remove Selected
+            </button>
             <button
               onClick={downloadRegistrations}
               disabled={status.saving || registrations.length === 0}
@@ -371,9 +513,15 @@ export default function AdminDashboardPage() {
               <table className="w-full text-sm text-left">
                 <thead className="bg-gray-100 text-gray-700">
                   <tr>
+                    <th className="p-3 w-10">
+                      <input
+                        type="checkbox"
+                        checked={registrations.length > 0 && selectedRegistrationIds.size === registrations.length}
+                        onChange={toggleAllRegistrations}
+                      />
+                    </th>
                     <th className="p-3">Full Name</th>
                     <th className="p-3">Email</th>
-                    <th className="p-3">Country</th>
                     <th className="p-3">DSP</th>
                     <th className="p-3">Group</th>
                     <th className="p-3">Submitted At</th>
@@ -382,9 +530,15 @@ export default function AdminDashboardPage() {
                 <tbody>
                   {registrations.map((r, i) => (
                     <tr key={i} className="border-t">
+                      <td className="p-3 w-10">
+                        <input
+                          type="checkbox"
+                          checked={selectedRegistrationIds.has(r.id)}
+                          onChange={() => toggleRegistration(r.id)}
+                        />
+                      </td>
                       <td className="p-3">{r.fullName}</td>
                       <td className="p-3">{r.email}</td>
-                      <td className="p-3">{r.country}</td>
                       <td className="p-3">{r.dsp}</td>
                       <td className="p-3">{r.group || '-'}</td>
                       <td className="p-3">{new Date(r.createdAt).toLocaleString()}</td>

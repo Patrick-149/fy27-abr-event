@@ -3,6 +3,7 @@ import { mkdirSync } from 'fs';
 import { join } from 'path';
 import multer from 'multer';
 import xlsx from 'xlsx';
+import { ObjectId } from 'mongodb';
 import { authenticate, requireAdmin } from '../auth.js';
 import { readJson, writeJson } from '../utils.js';
 import { getRegistrationsCollection, getGroupsCollection } from '../db.js';
@@ -108,7 +109,6 @@ router.get('/registrations', authenticate, requireAdmin, async (req, res, next) 
       id: r._id.toString(),
       fullName: r.fullName,
       email: r.email,
-      country: r.country,
       dsp: r.dsp,
       group: r.group || '',
       createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt
@@ -124,7 +124,6 @@ router.get('/registrations/export', authenticate, requireAdmin, async (req, res,
     const rows = (await collection.find().sort({ createdAt: -1 }).toArray()).map((r) => ({
       'Full Name': r.fullName,
       'Email': r.email,
-      'Country': r.country,
       'DSP': r.dsp,
       'Group': r.group || '',
       'Submitted At': r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt
@@ -179,6 +178,43 @@ router.put('/groups', authenticate, requireAdmin, async (req, res, next) => {
       { dsp: { $nin: [...dspSet] } },
       { $set: { group: '' } }
     );
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.delete('/registrations', authenticate, requireAdmin, async (req, res, next) => {
+  try {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
+    const objectIds = ids.filter(ObjectId.isValid).map((id) => new ObjectId(id));
+    if (objectIds.length === 0) {
+      return res.status(400).json({ message: 'No valid ids provided' });
+    }
+    await getRegistrationsCollection().deleteMany({ _id: { $in: objectIds } });
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.delete('/groups', authenticate, requireAdmin, async (req, res, next) => {
+  try {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
+    const objectIds = ids.filter(ObjectId.isValid).map((id) => new ObjectId(id));
+    if (objectIds.length === 0) {
+      return res.status(400).json({ message: 'No valid ids provided' });
+    }
+    const collection = getGroupsCollection();
+    const docs = await collection.find({ _id: { $in: objectIds } }).toArray();
+    const dspSet = new Set(docs.map((d) => d.dsp));
+    await collection.deleteMany({ _id: { $in: objectIds } });
+    if (dspSet.size > 0) {
+      await getRegistrationsCollection().updateMany(
+        { dsp: { $in: [...dspSet] } },
+        { $set: { group: '' } }
+      );
+    }
     res.json({ success: true });
   } catch (err) {
     next(err);

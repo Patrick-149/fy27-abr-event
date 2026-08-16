@@ -2,14 +2,12 @@ import { useState } from 'react';
 import api from '../api';
 import FormInput from '../components/FormInput';
 
-const COUNTRIES = ['Bangladesh', 'Malaysia', 'Pakistan', 'Singapore', 'Sri Lanka', 'Thailand', 'Vietnam'];
 const DSPS = ['1000Fix', 'CTC', 'Digipro', 'Inbox', 'ISS', 'NCR', 'Soft Logic', 'SOG', 'SVOA'];
 
 export default function RegistrationPage() {
   const [form, setForm] = useState({
     fullName: '',
     email: '',
-    country: '',
     dsp: ''
   });
   const [status, setStatus] = useState({
@@ -33,9 +31,14 @@ export default function RegistrationPage() {
       setStatus({
         loading: false,
         error: '',
-        success: `Registration submitted successfully! ${groupText}`
+        success: (
+          <>
+            Registration submitted successfully!{' '}
+            <strong>{groupText}</strong>
+          </>
+        )
       });
-      setForm({ fullName: '', email: '', country: '', dsp: '' });
+      setForm({ fullName: '', email: '', dsp: '' });
     } catch {
       setStatus({
         loading: false,
@@ -68,22 +71,6 @@ export default function RegistrationPage() {
           onChange={change('email')}
           required
         />
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700">
-            Country <span className="text-red-500">*</span>
-          </label>
-          <select
-            value={form.country}
-            onChange={change('country')}
-            required
-            className="mt-1 w-full border rounded-lg px-3 py-2"
-          >
-            <option value="">Select a country</option>
-            {COUNTRIES.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
-        </div>
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700">
             DSP <span className="text-red-500">*</span>
