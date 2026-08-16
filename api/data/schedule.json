@@ -1,0 +1,14 @@
+[
+  {
+    "id": "1",
+    "duration": "9:00-10:00",
+    "topic": "Welcome",
+    "presenter": "Looi Sua"
+  },
+  {
+    "id": "2",
+    "duration": "10:00:11:00",
+    "topic": "Business update",
+    "presenter": "Todd"
+  }
+]

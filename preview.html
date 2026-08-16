@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#2563eb" />
+  <title>FY27 ABR Preview</title>
+  <style>
+    :root { --brand: #2563eb; --brand-dark: #1d4ed8; }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f9fafb;
+      color: #111827;
+    }
+    #app { max-width: 768px; margin: 0 auto; min-height: 100vh; }
+    .page { display: none; min-height: 100vh; }
+    .page.active { display: block; }
+    header {
+      background: var(--brand);
+      color: #fff;
+      padding: 0.75rem 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header h1 { font-size: 1.125rem; margin: 0; }
+    header button {
+      background: transparent;
+      border: none;
+      color: #fff;
+      text-decoration: underline;
+      cursor: pointer;
+      font-size: 0.875rem;
+    }
+    .content { padding: 1rem; }
+    .login { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+    .card {
+      background: #fff;
+      border-radius: 1rem;
+      padding: 1.5rem;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      width: 100%;
+      max-width: 360px;
+    }
+    .card h2 { margin-top: 0; }
+    input, select, textarea {
+      width: 100%;
+      padding: 0.5rem;
+      border: 1px solid #d1d5db;
+      border-radius: 0.5rem;
+      margin-top: 0.25rem;
+      font-size: 1rem;
+    }
+    label { display: block; margin-top: 0.75rem; font-weight: 500; font-size: 0.875rem; color: #374151; }
+    .btn {
+      width: 100%;
+      background: var(--brand);
+      color: #fff;
+      border: none;
+      padding: 0.625rem;
+      border-radius: 0.5rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 1rem;
+      font-size: 1rem;
+    }
+    .btn:hover { background: var(--brand-dark); }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 1rem; margin-top: 1.5rem; }
+    @media (min-width: 640px) { .grid { grid-template-columns: 1fr 1fr; } }
+    .nav-btn {
+      background: var(--brand);
+      color: #fff;
+      border: none;
+      border-radius: 1rem;
+      padding: 1.5rem;
+      font-size: 1.25rem;
+      font-weight: 600;
+      cursor: pointer;
+      min-height: 120px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      transition: filter 0.15s;
+    }
+    .nav-btn:hover { filter: brightness(1.1); }
+    .back {
+      background: transparent;
+      border: none;
+      color: var(--brand);
+      font-size: 0.875rem;
+      cursor: pointer;
+      padding: 1rem 1rem 0;
+      display: block;
+    }
+    .item {
+      background: #fff;
+      border-radius: 0.75rem;
+      padding: 1rem;
+      margin-top: 0.75rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .badge {
+      background: var(--brand);
+      color: #fff;
+      font-size: 0.75rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.25rem;
+      white-space: nowrap;
+    }
+    .map-wrap {
+      position: relative;
+      width: 100%;
+      padding-bottom: 75%;
+      background: #e5e7eb;
+      border-radius: 0.75rem;
+      overflow: hidden;
+    }
+    .map-wrap svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .pin {
+      position: absolute;
+      width: 32px;
+      height: 32px;
+      background: var(--brand);
+      color: #fff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .alert { padding: 0.75rem; border-radius: 0.5rem; margin-bottom: 1rem; font-size: 0.875rem; }
+    .alert-success { background: #ecfdf5; color: #065f46; }
+    .alert-error { background: #fef2f2; color: #991b1b; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 0.75rem; overflow: hidden; }
+    th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid #e5e7eb; }
+    th { background: #f3f4f6; color: #374151; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <!-- Login -->
+    <div id="login" class="page active login">
+      <div class="card">
+        <h2>FY27 ABR</h2>
+        <p style="color:#6b7280;margin-top:0;">Event Details</p>
+        <label>Username</label>
+        <input value="attendee" />
+        <label>Password</label>
+        <input type="password" value="attendee123" />
+        <button class="btn" onclick="go('home')">Sign In</button>
+      </div>
+    </div>
+
+    <!-- Home -->
+    <div id="home" class="page">
+      <header>
+        <h1>FY27 ABR</h1>
+        <button onclick="go('login')">Logout</button>
+      </header>
+      <div class="content" style="text-align:center;">
+        <h2 style="margin-bottom:.25rem;">FY27 ABR</h2>
+        <p style="color:#6b7280;">Event Details</p>
+        <div class="grid">
+          <button class="nav-btn" onclick="go('schedule')">Meeting Schedule</button>
+          <button class="nav-btn" onclick="go('registration')">Registration Form</button>
+          <button class="nav-btn" onclick="go('restaurant')">Dinner Restaurant</button>
+          <button class="nav-btn" onclick="go('map')">Restroom Location Map</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Meeting Schedule -->
+    <div id="schedule" class="page">
+      <header>
+        <h1>FY27 ABR</h1>
+        <button onclick="go('login')">Logout</button>
+      </header>
+      <button class="back" onclick="go('home')">← Back</button>
+      <div class="content">
+        <h2>Meeting Schedule</h2>
+        <div class="item">
+          <div style="display:flex;justify-content:space-between;gap:1rem;">
+            <strong>Registration & Breakfast</strong>
+            <span class="badge">08:00</span>
+          </div>
+          <div style="color:#6b7280;font-size:.875rem;">Lobby</div>
+          <p style="margin:.5rem 0 0;">Pick up your badge and enjoy a light breakfast.</p>
+        </div>
+        <div class="item">
+          <div style="display:flex;justify-content:space-between;gap:1rem;">
+            <strong>Opening Remarks</strong>
+            <span class="badge">09:00</span>
+          </div>
+          <div style="color:#6b7280;font-size:.875rem;">Main Hall</div>
+          <p style="margin:.5rem 0 0;">Welcome to FY27 ABR and overview of the day.</p>
+        </div>
+        <div class="item">
+          <div style="display:flex;justify-content:space-between;gap:1rem;">
+            <strong>FY27 Strategic Review</strong>
+            <span class="badge">10:30</span>
+          </div>
+          <div style="color:#6b7280;font-size:.875rem;">Main Hall</div>
+          <p style="margin:.5rem 0 0;">Leadership review of fiscal year priorities and goals.</p>
+        </div>
+        <div class="item">
+          <div style="display:flex;justify-content:space-between;gap:1rem;">
+            <strong>Lunch Break</strong>
+            <span class="badge">12:00</span>
+          </div>
+          <div style="color:#6b7280;font-size:.875rem;">Dining Area</div>
+          <p style="margin:.5rem 0 0;">Networking lunch with colleagues.</p>
+        </div>
+        <div class="item">
+          <div style="display:flex;justify-content:space-between;gap:1rem;">
+            <strong>Regional Breakout Sessions</strong>
+            <span class="badge">13:30</span>
+          </div>
+          <div style="color:#6b7280;font-size:.875rem;">Meeting Rooms A & B</div>
+          <p style="margin:.5rem 0 0;">Discussions by region on market performance.</p>
+        </div>
+        <div class="item">
+          <div style="display:flex;justify-content:space-between;gap:1rem;">
+            <strong>Closing Session</strong>
+            <span class="badge">16:00</span>
+          </div>
+          <div style="color:#6b7280;font-size:.875rem;">Main Hall</div>
+          <p style="margin:.5rem 0 0;">Summary, Q&A, and closing remarks.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Registration -->
+    <div id="registration" class="page">
+      <header>
+        <h1>FY27 ABR</h1>
+        <button onclick="go('login')">Logout</button>
+      </header>
+      <button class="back" onclick="go('home')">← Back</button>
+      <div class="content">
+        <h2>Registration Form</h2>
+        <div id="reg-success" class="alert alert-success" style="display:none;">Registration submitted successfully!</div>
+        <div class="item">
+          <label>Full Name</label>
+          <input id="reg-name" />
+          <label>Email</label>
+          <input id="reg-email" type="email" />
+          <label>Dietary Requirements / Notes</label>
+          <textarea id="reg-dietary" rows="3"></textarea>
+          <label>Will you attend?</label>
+          <select id="reg-attending">
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+            <option value="maybe">Maybe</option>
+          </select>
+          <button class="btn" onclick="submitReg()">Submit Registration</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Restaurant -->
+    <div id="restaurant" class="page">
+      <header>
+        <h1>FY27 ABR</h1>
+        <button onclick="go('login')">Logout</button>
+      </header>
+      <button class="back" onclick="go('home')">← Back</button>
+      <div class="content">
+        <h2>The Riverside Grill</h2>
+        <p style="color:#6b7280;">123 Riverwalk Boulevard, Suite 100</p>
+        <p style="color:#6b7280;">(555) 123-4567</p>
+        <p style="color:var(--brand);font-weight:600;">6:00 PM – 10:00 PM</p>
+        <p>Business casual attire is requested. Vegetarian, vegan, and gluten-free options are available upon request.</p>
+        <div class="item">
+          <strong>Starter</strong>
+          <ul style="color:#6b7280;margin:.25rem 0 0;padding-left:1.25rem;">
+            <li>Mixed green salad with balsamic vinaigrette</li>
+            <li>Tomato bisque with fresh basil</li>
+          </ul>
+        </div>
+        <div class="item">
+          <strong>Entrée</strong>
+          <ul style="color:#6b7280;margin:.25rem 0 0;padding-left:1.25rem;">
+            <li>Grilled salmon with lemon butter</li>
+            <li>Herb-crusted chicken</li>
+            <li>Creamy vegetable risotto</li>
+          </ul>
+        </div>
+        <div class="item">
+          <strong>Dessert</strong>
+          <ul style="color:#6b7280;margin:.25rem 0 0;padding-left:1.25rem;">
+            <li>Chocolate mousse</li>
+            <li>Seasonal fruit tart</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Restroom Map -->
+    <div id="map" class="page">
+      <header>
+        <h1>FY27 ABR</h1>
+        <button onclick="go('login')">Logout</button>
+      </header>
+      <button class="back" onclick="go('home')">← Back</button>
+      <div class="content">
+        <h2>Restroom Locations</h2>
+        <div class="map-wrap">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+            <rect width="800" height="600" fill="#f3f4f6"/>
+            <rect x="50" y="50" width="700" height="500" fill="none" stroke="#9ca3af" stroke-width="4"/>
+            <text x="400" y="40" text-anchor="middle" font-size="24" fill="#374151" font-family="Arial, sans-serif">Main Hall</text>
+            <rect x="80" y="100" width="280" height="180" fill="#e5e7eb" stroke="#6b7280" stroke-width="2"/>
+            <text x="220" y="195" text-anchor="middle" font-size="18" fill="#4b5563" font-family="Arial, sans-serif">Meeting Room A</text>
+            <rect x="440" y="100" width="280" height="180" fill="#e5e7eb" stroke="#6b7280" stroke-width="2"/>
+            <text x="580" y="195" text-anchor="middle" font-size="18" fill="#4b5563" font-family="Arial, sans-serif">Meeting Room B</text>
+            <rect x="80" y="340" width="640" height="180" fill="#e5e7eb" stroke="#6b7280" stroke-width="2"/>
+            <text x="400" y="435" text-anchor="middle" font-size="18" fill="#4b5563" font-family="Arial, sans-serif">Dining Area</text>
+            <text x="400" y="560" text-anchor="middle" font-size="14" fill="#6b7280" font-family="Arial, sans-serif">Entrance</text>
+          </svg>
+          <div class="pin" style="left:22%;top:32%;" title="Restroom A">A</div>
+          <div class="pin" style="left:76%;top:30%;" title="Restroom B">B</div>
+          <div class="pin" style="left:78%;top:74%;" title="Restroom C">C</div>
+        </div>
+        <ul style="margin-top:1rem;padding-left:1.25rem;color:#4b5563;">
+          <li><strong>Restroom A</strong> — 22%, 32%</li>
+          <li><strong>Restroom B</strong> — 76%, 30%</li>
+          <li><strong>Restroom C</strong> — 78%, 74%</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function go(id) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+    function submitReg() {
+      document.getElementById('reg-name').value = '';
+      document.getElementById('reg-email').value = '';
+      document.getElementById('reg-dietary').value = '';
+      document.getElementById('reg-attending').value = 'yes';
+      const msg = document.getElementById('reg-success');
+      msg.style.display = 'block';
+      setTimeout(() => msg.style.display = 'none', 3000);
+    }
+  </script>
+</body>
+</html>
