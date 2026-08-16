@@ -5,6 +5,7 @@ import multer from 'multer';
 import xlsx from 'xlsx';
 import { authenticate, requireAdmin } from '../auth.js';
 import { readJson, writeJson } from '../utils.js';
+import { getRegistrationsCollection } from '../db.js';
 
 const router = Router();
 
@@ -99,16 +100,32 @@ router.put('/restrooms', authenticate, requireAdmin, putData('restrooms.json'));
 router.get('/poc', authenticate, requireAdmin, getData('poc.json'));
 router.put('/poc', authenticate, requireAdmin, putData('poc.json'));
 
-router.get('/registrations', authenticate, requireAdmin, getData('registrations.json'));
+router.get('/registrations', authenticate, requireAdmin, async (req, res, next) => {
+  try {
+    const collection = getRegistrationsCollection();
+    const registrations = await collection.find().sort({ createdAt: -1 }).toArray();
+    res.json(registrations.map((r) => ({
+      id: r._id.toString(),
+      fullName: r.fullName,
+      email: r.email,
+      country: r.country,
+      dsp: r.dsp,
+      createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt
+    })));
+  } catch (err) {
+    next(err);
+  }
+});
 
 router.get('/registrations/export', authenticate, requireAdmin, async (req, res, next) => {
   try {
-    const rows = (await readJson('registrations.json')).map((r) => ({
+    const collection = getRegistrationsCollection();
+    const rows = (await collection.find().sort({ createdAt: -1 }).toArray()).map((r) => ({
       'Full Name': r.fullName,
       'Email': r.email,
       'Country': r.country,
       'DSP': r.dsp,
-      'Submitted At': r.createdAt
+      'Submitted At': r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt
     }));
     const worksheet = xlsx.utils.json_to_sheet(rows);
     const workbook = xlsx.utils.book_new();

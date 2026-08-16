@@ -114,6 +114,7 @@ JWT_SECRET=any_long_random_string
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=admin123
 WEB_URL=*
+MONGODB_URI=your_mongodb_atlas_connection_string
 ```
 
 6. Click **Create Web Service**. Render will build and deploy and give you a URL like `https://fy27-abr-event.onrender.com`.

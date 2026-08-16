@@ -1,7 +1,8 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
+import { connectDb } from './db.js';
 import authRoutes from './routes/auth.js';
 import scheduleRoutes from './routes/schedule.js';
 import restaurantRoutes from './routes/restaurant.js';
@@ -13,11 +14,14 @@ import { fileURLToPath } from 'url';
 import { dirname, resolve, join } from 'path';
 import fs from 'fs';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+dotenv.config({ path: join(__dirname, '.env') });
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 const distPath = resolve(__dirname, '..', 'web', 'dist');
 
 app.use(cors({
@@ -53,6 +57,7 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({ message: err.message || 'Internal server error' });
 });
 
+await connectDb();
 app.listen(PORT, () => {
   console.log(`FY27 ABR API listening on http://localhost:${PORT}`);
 });
