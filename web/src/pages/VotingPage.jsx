@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api from '../api';
 
 export default function VotingPage() {
@@ -7,6 +7,7 @@ export default function VotingPage() {
   const [email, setEmail] = useState('');
   const [selectedGroupId, setSelectedGroupId] = useState('');
   const [status, setStatus] = useState({ loading: false, error: '', success: '' });
+  const autoRefreshIntervalRef = useRef(null);
 
   useEffect(() => {
     const load = async () => {
@@ -20,6 +21,18 @@ export default function VotingPage() {
       }
     };
     load();
+
+    // Set up auto-refresh to detect session changes and timer updates
+    autoRefreshIntervalRef.current = setInterval(() => {
+      load();
+    }, 5000);
+
+    return () => {
+      if (autoRefreshIntervalRef.current) {
+        clearInterval(autoRefreshIntervalRef.current);
+        autoRefreshIntervalRef.current = null;
+      }
+    };
   }, []);
 
   const submit = async (e) => {
