@@ -10,6 +10,7 @@ import RegistrationPage from './pages/RegistrationPage';
 import RestaurantPage from './pages/RestaurantPage';
 import PocContactPage from './pages/PocContactPage';
 import RestroomMapPage from './pages/RestroomMapPage';
+import VotingPage from './pages/VotingPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
 
 export default function App() {
@@ -25,6 +26,7 @@ export default function App() {
           <Route path="/restaurant" element={<RestaurantPage />} />
           <Route path="/restrooms" element={<RestroomMapPage />} />
           <Route path="/poc-contact" element={<PocContactPage />} />
+          <Route path="/voting" element={<VotingPage />} />
           <Route element={<AdminRoute />}>
             <Route path="/admin" element={<AdminDashboardPage />} />
           </Route>

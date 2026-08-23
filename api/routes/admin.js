@@ -6,7 +6,7 @@ import xlsx from 'xlsx';
 import { ObjectId } from 'mongodb';
 import { authenticate, requireAdmin } from '../auth.js';
 import { readJson, writeJson } from '../utils.js';
-import { getRegistrationsCollection, getGroupsCollection } from '../db.js';
+import { getRegistrationsCollection, getGroupsCollection, getVotingGroupsCollection, getVotesCollection } from '../db.js';
 
 const router = Router();
 
@@ -216,6 +216,87 @@ router.delete('/groups', authenticate, requireAdmin, async (req, res, next) => {
       );
     }
     res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/voting-config', authenticate, requireAdmin, async (req, res, next) => {
+  try {
+    const config = await getVotingGroupsCollection().findOne({ _id: 'config' });
+    res.json(config || { _id: 'config', groups: [], description: '', enabled: false, timerEnd: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put('/voting-config', authenticate, requireAdmin, async (req, res, next) => {
+  try {
+    const { groups, description, enabled } = req.body || {};
+    await getVotingGroupsCollection().updateOne(
+      { _id: 'config' },
+      { $set: { groups: groups || [], description: description || '', enabled: !!enabled } },
+      { upsert: true }
+    );
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/voting-timer', authenticate, requireAdmin, async (req, res, next) => {
+  try {
+    const { durationMinutes } = req.body || {};
+    const duration = Number(durationMinutes) || 0;
+    const timerEnd = duration > 0 ? new Date(Date.now() + duration * 60 * 1000).toISOString() : null;
+    await getVotingGroupsCollection().updateOne(
+      { _id: 'config' },
+      { $set: { timerEnd } },
+      { upsert: true }
+    );
+    res.json({ success: true, timerEnd });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/voting-results', authenticate, requireAdmin, async (req, res, next) => {
+  try {
+    const config = await getVotingGroupsCollection().findOne({ _id: 'config' });
+    const groups = config?.groups || [];
+    const votes = await getVotesCollection().find().toArray();
+    const voteCounts = new Map();
+    votes.forEach((v) => {
+      const count = voteCounts.get(v.groupId) || 0;
+      voteCounts.set(v.groupId, count + 1);
+    });
+    const results = groups.map((g) => ({
+      id: g.id,
+      name: g.name,
+      votes: voteCounts.get(g.id) || 0
+    }));
+    const timerEnd = config?.timerEnd || null;
+    res.json({ results, timerEnd, totalVotes: votes.length });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/voting-export', authenticate, requireAdmin, async (req, res, next) => {
+  try {
+    const votes = await getVotesCollection().find().sort({ votedAt: 1 }).toArray();
+    const rows = votes.map((v) => ({
+      'Email': v.email,
+      'Group': v.groupName,
+      'Voted At': v.votedAt instanceof Date ? v.votedAt.toISOString() : v.votedAt
+    }));
+    const worksheet = xlsx.utils.json_to_sheet(rows);
+    const workbook = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(workbook, worksheet, 'Votes');
+    const buffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    res.setHeader('Content-Disposition', 'attachment; filename="votes.xlsx"');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.send(buffer);
   } catch (err) {
     next(err);
   }

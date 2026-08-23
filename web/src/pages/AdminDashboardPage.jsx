@@ -2,15 +2,18 @@ import { useEffect, useState } from 'react';
 import api from '../api';
 import EditableList from '../components/EditableList';
 import Loading from '../components/Loading';
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
-const TABS = ['schedule', 'restaurant', 'poc', 'groups', 'registrations'];
+const TABS = ['schedule', 'restaurant', 'poc', 'groups', 'registrations', 'voting-groups', 'voting-results'];
 const TAB_LABELS = {
   schedule: 'Schedule',
   restaurant: 'Restaurant',
   poc: 'POC Contact',
   groups: 'Groups',
   restrooms: 'Restrooms',
-  registrations: 'Registrations'
+  registrations: 'Registrations',
+  'voting-groups': 'Voting Groups',
+  'voting-results': 'Voting Results'
 };
 const GROUP_DSPS = [
   '1000Fix',
@@ -56,6 +59,9 @@ export default function AdminDashboardPage() {
   const [selectedRegistrationIds, setSelectedRegistrationIds] = useState(new Set());
   const [groups, setGroups] = useState([]);
   const [selectedGroupIds, setSelectedGroupIds] = useState(new Set());
+  const [votingConfig, setVotingConfig] = useState({ groups: [], description: '', enabled: false, timerEnd: null });
+  const [votingResults, setVotingResults] = useState({ results: [], timerEnd: null, totalVotes: 0 });
+  const [timerDuration, setTimerDuration] = useState('');
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({ saving: false, message: '', error: '' });
   const [uploadFile, setUploadFile] = useState(null);
@@ -64,13 +70,14 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [s, r, rr, p, g, reg] = await Promise.all([
+        const [s, r, rr, p, g, reg, vc] = await Promise.all([
           api.get('/api/admin/schedule'),
           api.get('/api/admin/restaurant'),
           api.get('/api/admin/restrooms'),
           api.get('/api/admin/poc'),
           api.get('/api/admin/groups'),
-          api.get('/api/admin/registrations')
+          api.get('/api/admin/registrations'),
+          api.get('/api/admin/voting-config')
         ]);
         setSchedule(s.data);
         setRestaurant({
@@ -85,6 +92,7 @@ export default function AdminDashboardPage() {
         setPoc(p.data);
         setGroups(g.data);
         setRegistrations(reg.data);
+        setVotingConfig(vc.data);
       } catch {
         setStatus({ saving: false, message: '', error: 'Failed to load admin data.' });
       } finally {
@@ -264,6 +272,89 @@ export default function AdminDashboardPage() {
       setStatus({ saving: false, message: 'Removed successfully.', error: '' });
     } catch {
       setStatus({ saving: false, message: '', error: 'Remove failed.' });
+    }
+  };
+
+  const saveVotingConfig = async () => {
+    setStatus({ saving: true, message: '', error: '' });
+    try {
+      await api.put('/api/admin/voting-config', votingConfig);
+      setStatus({ saving: false, message: 'Voting config saved.', error: '' });
+    } catch {
+      setStatus({ saving: false, message: '', error: 'Failed to save voting config.' });
+    }
+  };
+
+  const addVotingGroup = () => {
+    setVotingConfig({
+      ...votingConfig,
+      groups: [...votingConfig.groups, { id: `${Date.now()}`, name: '' }]
+    });
+  };
+
+  const updateVotingGroup = (id, field, value) => {
+    setVotingConfig({
+      ...votingConfig,
+      groups: votingConfig.groups.map((g) => (g.id === id ? { ...g, [field]: value } : g))
+    });
+  };
+
+  const removeVotingGroup = (id) => {
+    setVotingConfig({
+      ...votingConfig,
+      groups: votingConfig.groups.filter((g) => g.id !== id)
+    });
+  };
+
+  const startTimer = async () => {
+    const duration = Number(timerDuration);
+    if (!duration || duration <= 0) return;
+    setStatus({ saving: true, message: '', error: '' });
+    try {
+      const { data } = await api.post('/api/admin/voting-timer', { durationMinutes: duration });
+      setVotingConfig({ ...votingConfig, timerEnd: data.timerEnd });
+      setStatus({ saving: false, message: 'Timer started.', error: '' });
+    } catch {
+      setStatus({ saving: false, message: '', error: 'Failed to start timer.' });
+    }
+  };
+
+  const resetTimer = async () => {
+    setStatus({ saving: true, message: '', error: '' });
+    try {
+      await api.post('/api/admin/voting-timer', { durationMinutes: 0 });
+      setVotingConfig({ ...votingConfig, timerEnd: null });
+      setStatus({ saving: false, message: 'Timer reset.', error: '' });
+    } catch {
+      setStatus({ saving: false, message: '', error: 'Failed to reset timer.' });
+    }
+  };
+
+  const loadVotingResults = async () => {
+    setStatus({ saving: true, message: '', error: '' });
+    try {
+      const { data } = await api.get('/api/admin/voting-results');
+      setVotingResults(data);
+      setStatus({ saving: false, message: '', error: '' });
+    } catch {
+      setStatus({ saving: false, message: '', error: 'Failed to load voting results.' });
+    }
+  };
+
+  const downloadVotingResults = async () => {
+    try {
+      const response = await api.get('/api/admin/voting-export', { responseType: 'blob' });
+      const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'votes.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      setStatus({ saving: false, message: '', error: 'Download failed.' });
     }
   };
 
@@ -574,6 +665,168 @@ export default function AdminDashboardPage() {
                 </tbody>
               </table>
             )}
+          </div>
+        </div>
+      )}
+
+      {tab === 'voting-groups' && (
+        <div>
+          <p className="text-sm text-gray-600 mb-2">
+            Manage voting groups and enable/disable voting.
+          </p>
+          <div className="bg-white rounded-xl p-4 shadow space-y-3 mb-4">
+            <h3 className="font-bold text-lg">Voting Groups</h3>
+            {votingConfig.groups.map((g) => (
+              <div key={g.id} className="flex gap-2 items-center">
+                <input
+                  value={g.name}
+                  onChange={(e) => updateVotingGroup(g.id, 'name', e.target.value)}
+                  className="flex-1 border rounded px-2 py-1"
+                  placeholder="Group name"
+                />
+                <button
+                  onClick={() => removeVotingGroup(g.id)}
+                  className="text-red-600 text-sm hover:underline"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+            <button
+              onClick={addVotingGroup}
+              className="w-full py-2 border-2 border-dashed border-brand text-brand rounded-lg"
+            >
+              + Add Group
+            </button>
+          </div>
+          <div className="bg-white rounded-xl p-4 shadow space-y-3 mb-4">
+            <h3 className="font-bold text-lg">Description</h3>
+            <textarea
+              value={votingConfig.description}
+              onChange={(e) => setVotingConfig({ ...votingConfig, description: e.target.value })}
+              className="w-full border rounded px-3 py-2"
+              rows={3}
+              placeholder="Free text about group name/group member"
+            />
+          </div>
+          <div className="bg-white rounded-xl p-4 shadow space-y-3 mb-4">
+            <h3 className="font-bold text-lg">Voting Status</h3>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={votingConfig.enabled}
+                onChange={(e) => setVotingConfig({ ...votingConfig, enabled: e.target.checked })}
+              />
+              <span>Enable voting</span>
+            </label>
+          </div>
+          <button
+            onClick={saveVotingConfig}
+            disabled={status.saving}
+            className="w-full bg-brand text-white py-2 rounded-lg font-semibold disabled:opacity-50"
+          >
+            {status.saving ? 'Saving...' : 'Save Voting Config'}
+          </button>
+        </div>
+      )}
+
+      {tab === 'voting-results' && (
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <button
+              onClick={loadVotingResults}
+              disabled={status.saving}
+              className="bg-brand text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
+            >
+              Refresh Results
+            </button>
+            <button
+              onClick={downloadVotingResults}
+              disabled={status.saving}
+              className="bg-brand text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
+            >
+              Download Results
+            </button>
+          </div>
+          <div className="bg-white rounded-xl p-4 shadow space-y-4 mb-4">
+            <h3 className="font-bold text-lg">Timer</h3>
+            <div className="flex gap-2 items-center">
+              <input
+                type="number"
+                value={timerDuration}
+                onChange={(e) => setTimerDuration(e.target.value)}
+                className="w-24 border rounded px-2 py-1"
+                placeholder="Minutes"
+                min="1"
+              />
+              <button
+                onClick={startTimer}
+                disabled={status.saving || !timerDuration}
+                className="bg-brand text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
+              >
+                Start Timer
+              </button>
+              <button
+                onClick={resetTimer}
+                disabled={status.saving}
+                className="bg-gray-600 text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
+              >
+                Reset
+              </button>
+            </div>
+            {votingConfig.timerEnd && (
+              <div className="text-sm text-gray-600">
+                Timer ends at: {new Date(votingConfig.timerEnd).toLocaleString()}
+              </div>
+            )}
+          </div>
+          <div className="bg-white rounded-xl p-4 shadow mb-4">
+            <h3 className="font-bold text-lg mb-4">Vote Distribution</h3>
+            {votingResults.results.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={votingResults.results}
+                    dataKey="votes"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    label
+                  >
+                    {votingResults.results.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={`hsl(${index * 360 / votingResults.results.length}, 70%, 50%)`} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="text-gray-500">No votes yet.</p>
+            )}
+          </div>
+          <div className="bg-white rounded-xl p-4 shadow">
+            <h3 className="font-bold text-lg mb-2">Vote Counts</h3>
+            <table className="w-full text-sm text-left">
+              <thead className="bg-gray-100 text-gray-700">
+                <tr>
+                  <th className="p-3">Group</th>
+                  <th className="p-3">Votes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {votingResults.results.map((r) => (
+                  <tr key={r.id} className="border-t">
+                    <td className="p-3">{r.name}</td>
+                    <td className="p-3">{r.votes}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="mt-2 text-sm text-gray-600">
+              Total votes: {votingResults.totalVotes}
+            </div>
           </div>
         </div>
       )}

@@ -20,7 +20,7 @@ export async function connectDb() {
 
   await client.connect();
   db = client.db('fy27abr');
-  for (const name of ['registrations', 'groups']) {
+  for (const name of ['registrations', 'groups', 'votingGroups', 'votes']) {
     try {
       await db.createCollection(name);
     } catch (err) {
@@ -39,6 +39,16 @@ export function getRegistrationsCollection() {
 export function getGroupsCollection() {
   if (!db) throw new Error('Database not connected');
   return db.collection('groups');
+}
+
+export function getVotingGroupsCollection() {
+  if (!db) throw new Error('Database not connected');
+  return db.collection('votingGroups');
+}
+
+export function getVotesCollection() {
+  if (!db) throw new Error('Database not connected');
+  return db.collection('votes');
 }
 
 export async function closeDb() {

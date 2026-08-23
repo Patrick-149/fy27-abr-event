@@ -10,6 +10,7 @@ import restroomRoutes from './routes/restrooms.js';
 import registrationRoutes from './routes/registration.js';
 import pocRoutes from './routes/poc.js';
 import adminRoutes from './routes/admin.js';
+import votingRoutes from './routes/voting.js';
 import { fileURLToPath } from 'url';
 import { dirname, resolve, join } from 'path';
 import fs from 'fs';
@@ -40,6 +41,7 @@ app.use('/api/restrooms', restroomRoutes);
 app.use('/api/register', registrationRoutes);
 app.use('/api/poc', pocRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/voting', votingRoutes);
 
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
