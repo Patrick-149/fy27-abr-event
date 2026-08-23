@@ -795,10 +795,17 @@ export default function AdminDashboardPage() {
             ) : (
               <div className="space-y-2">
                 {votingSessions.map((s) => (
-                  <div key={s.id} className="border rounded-lg p-3">
+                  <div key={s.id} className={`border rounded-lg p-3 ${s.enabled ? 'border-green-300 bg-green-50' : 'border-gray-300 bg-gray-50'}`}>
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex-1">
-                        <p className="font-medium">{s.sessionDescription}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{s.sessionDescription}</p>
+                          {s.enabled ? (
+                            <span className="text-xs bg-green-600 text-white px-2 py-0.5 rounded">Enabled</span>
+                          ) : (
+                            <span className="text-xs bg-gray-400 text-white px-2 py-0.5 rounded">Disabled</span>
+                          )}
+                        </div>
                         <p className="text-sm text-gray-500">
                           Created: {new Date(s.createdAt).toLocaleString()}
                         </p>
@@ -815,14 +822,26 @@ export default function AdminDashboardPage() {
                         Delete
                       </button>
                     </div>
-                    <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={s.enabled}
-                        onChange={(e) => updateVotingSession(s.id, { enabled: e.target.checked })}
-                      />
-                      <span>Enabled</span>
-                    </label>
+                    <div className="flex items-center gap-2">
+                      {s.enabled ? (
+                        <button
+                          onClick={() => updateVotingSession(s.id, { enabled: false })}
+                          className="text-sm bg-red-100 text-red-700 px-3 py-1 rounded hover:bg-red-200"
+                        >
+                          Disable
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => updateVotingSession(s.id, { enabled: true })}
+                          className="text-sm bg-green-100 text-green-700 px-3 py-1 rounded hover:bg-green-200"
+                        >
+                          Enable
+                        </button>
+                      )}
+                      <span className="text-sm text-gray-600">
+                        {s.enabled ? 'Session enabled' : 'Session disabled'}
+                      </span>
+                    </div>
                   </div>
                 ))}
               </div>
