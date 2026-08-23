@@ -344,6 +344,19 @@ router.post('/voting-sessions/:id/reset', authenticate, requireAdmin, async (req
   }
 });
 
+router.post('/voting-sessions/:id/reset-timer', authenticate, requireAdmin, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    await getVotingSessionsCollection().updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { timerEnd: null, remainingMinutes: null } }
+    );
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/voting-sessions/:id/results', authenticate, requireAdmin, async (req, res, next) => {
   try {
     const { id } = req.params;

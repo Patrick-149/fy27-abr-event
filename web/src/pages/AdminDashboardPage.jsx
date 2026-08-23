@@ -512,6 +512,22 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const resetTimer = async () => {
+    if (!selectedSessionId) return;
+    setStatus({ saving: true, message: '', error: '' });
+    try {
+      await api.post(`/api/admin/voting-sessions/${selectedSessionId}/reset-timer`);
+      const { data: sessions } = await api.get('/api/admin/voting-sessions');
+      setVotingSessions(sessions);
+      setTimerDuration('');
+      setCountdown(null);
+      setTimerExpired(false);
+      setStatus({ saving: false, message: 'Timer reset.', error: '' });
+    } catch {
+      setStatus({ saving: false, message: '', error: 'Failed to reset timer.' });
+    }
+  };
+
   const loadVotingResults = async () => {
     if (!selectedSessionId) return;
     setStatus({ saving: true, message: '', error: '' });
@@ -1027,6 +1043,13 @@ export default function AdminDashboardPage() {
                   <option key={s.id} value={s.id}>{s.sessionDescription}</option>
                 ))}
               </select>
+              <button
+                onClick={resetVotes}
+                disabled={status.saving || !selectedSessionId}
+                className="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
+              >
+                Reset Votes
+              </button>
             </div>
             <div className="flex gap-2">
               <button
@@ -1087,11 +1110,11 @@ export default function AdminDashboardPage() {
                     return null;
                   })()}
                   <button
-                    onClick={resetVotes}
+                    onClick={resetTimer}
                     disabled={status.saving || !selectedSessionId}
                     className="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
                   >
-                    Reset
+                    Reset Timer
                   </button>
                 </div>
                 {countdown !== null && (
