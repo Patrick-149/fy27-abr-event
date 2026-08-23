@@ -1117,12 +1117,23 @@ export default function AdminDashboardPage() {
             <div className="flex gap-2 items-center">
               <select
                 value={selectedSessionId || ''}
-                onChange={(e) => setSelectedSessionId(e.target.value)}
+                onChange={(e) => {
+                  const newSessionId = e.target.value;
+                  setSelectedSessionId(newSessionId);
+                  // Automatically enable the selected session and disable others
+                  if (newSessionId) {
+                    votingSessions.forEach(session => {
+                      updateVotingSession(session.id, { enabled: session.id === newSessionId });
+                    });
+                  }
+                }}
                 className="border rounded px-2 py-1"
               >
                 <option value="">Select a session</option>
-                {votingSessions.filter(s => s.enabled).map((s) => (
-                  <option key={s.id} value={s.id}>{s.sessionDescription}</option>
+                {votingSessions.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.sessionDescription} {s.enabled ? '✓' : ''}
+                  </option>
                 ))}
               </select>
               <button
