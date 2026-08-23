@@ -65,6 +65,7 @@ export default function AdminDashboardPage() {
   const [timerDuration, setTimerDuration] = useState('');
   const [countdown, setCountdown] = useState(null);
   const [newSessionDescription, setNewSessionDescription] = useState('');
+  const [sessionToEnable, setSessionToEnable] = useState('');
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({ saving: false, message: '', error: '' });
   const [uploadFile, setUploadFile] = useState(null);
@@ -114,8 +115,8 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     if (tab !== 'voting-results' || !selectedSessionId) return;
     const session = votingSessions.find((s) => s.id === selectedSessionId);
-    // Only auto-refresh if timer has been started
-    if (!session?.timerEnd) return;
+    // Only auto-refresh if timer has been started (running or paused)
+    if (!session?.timerEnd && !session?.remainingMinutes) return;
     
     loadVotingResults();
     const interval = setInterval(() => {
@@ -126,10 +127,25 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     const session = votingSessions.find((s) => s.id === selectedSessionId);
+    
+    // Handle paused state - show static remaining time
+    if (session?.remainingMinutes) {
+      const hours = Math.floor(session.remainingMinutes / 60);
+      const minutes = session.remainingMinutes % 60;
+      setCountdown(
+        `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00 (Paused)`
+      );
+      setTimerDuration(session.remainingMinutes.toString());
+      return;
+    }
+    
+    // Handle no timer state
     if (!session?.timerEnd) {
       setCountdown(null);
       return;
     }
+    
+    // Handle running timer state
     const updateCountdown = () => {
       const now = new Date();
       const end = new Date(session.timerEnd);
@@ -410,6 +426,58 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const pauseTimer = async () => {
+    if (!selectedSessionId) return;
+    setStatus({ saving: true, message: '', error: '' });
+    try {
+      const session = votingSessions.find((s) => s.id === selectedSessionId);
+      if (!session?.timerEnd) {
+        setStatus({ saving: false, message: '', error: 'No active timer to pause.' });
+        return;
+      }
+      
+      // Calculate remaining time
+      const now = new Date();
+      const end = new Date(session.timerEnd);
+      const remainingMs = end - now;
+      const remainingMinutes = Math.max(0, Math.ceil(remainingMs / (1000 * 60)));
+      
+      // Store remaining time and clear timer
+      await api.post(`/api/admin/voting-sessions/${selectedSessionId}/timer`, { durationMinutes: remainingMinutes, paused: true });
+      const { data: sessions } = await api.get('/api/admin/voting-sessions');
+      setVotingSessions(sessions);
+      setTimerDuration(remainingMinutes.toString());
+      // Countdown will be updated by the useEffect when session has remainingMinutes
+      setStatus({ saving: false, message: 'Timer paused.', error: '' });
+    } catch {
+      setStatus({ saving: false, message: '', error: 'Failed to pause timer.' });
+    }
+  };
+
+  const continueTimer = async () => {
+    if (!selectedSessionId) return;
+    const session = votingSessions.find((s) => s.id === selectedSessionId);
+    
+    // Use remainingMinutes if available (paused state), otherwise use input
+    const duration = session?.remainingMinutes ? session.remainingMinutes : Number(timerDuration);
+    if (!duration || duration <= 0) {
+      setStatus({ saving: false, message: '', error: 'Please enter a valid duration.' });
+      return;
+    }
+    
+    setStatus({ saving: true, message: '', error: '' });
+    try {
+      const { data } = await api.post(`/api/admin/voting-sessions/${selectedSessionId}/timer`, { durationMinutes: duration });
+      const { data: sessions } = await api.get('/api/admin/voting-sessions');
+      setVotingSessions(sessions);
+      setTimerDuration(duration.toString());
+      // Countdown will be updated by the useEffect when session has timerEnd
+      setStatus({ saving: false, message: 'Timer continued.', error: '' });
+    } catch {
+      setStatus({ saving: false, message: '', error: 'Failed to continue timer.' });
+    }
+  };
+
   const resetVotes = async () => {
     if (!selectedSessionId) return;
     if (!window.confirm('Are you sure you want to reset all votes for this session?')) return;
@@ -418,6 +486,8 @@ export default function AdminDashboardPage() {
       await api.post(`/api/admin/voting-sessions/${selectedSessionId}/reset`);
       const { data: sessions } = await api.get('/api/admin/voting-sessions');
       setVotingSessions(sessions);
+      setTimerDuration('');
+      setCountdown(null);
       setStatus({ saving: false, message: 'Votes reset.', error: '' });
     } catch {
       setStatus({ saving: false, message: '', error: 'Failed to reset votes.' });
@@ -789,7 +859,34 @@ export default function AdminDashboardPage() {
             </div>
           </div>
           <div className="bg-white rounded-xl p-4 shadow space-y-3 mb-4">
-            <h3 className="font-bold text-lg">Sessions</h3>
+            <h3 className="font-bold text-lg">Enable/Disable Sessions</h3>
+            <div className="flex gap-2 items-center">
+              <select
+                value={sessionToEnable}
+                onChange={(e) => setSessionToEnable(e.target.value)}
+                className="flex-1 border rounded px-2 py-1"
+              >
+                <option value="">Select a session to enable</option>
+                {votingSessions.filter(s => !s.enabled).map((s) => (
+                  <option key={s.id} value={s.id}>{s.sessionDescription}</option>
+                ))}
+              </select>
+              <button
+                onClick={() => {
+                  if (sessionToEnable) {
+                    updateVotingSession(sessionToEnable, { enabled: true });
+                    setSessionToEnable('');
+                  }
+                }}
+                disabled={status.saving || !sessionToEnable}
+                className="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
+              >
+                Enable Session
+              </button>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl p-4 shadow space-y-3 mb-4">
+            <h3 className="font-bold text-lg">Sessions Status</h3>
             {votingSessions.length === 0 ? (
               <p className="text-gray-500">No sessions yet.</p>
             ) : (
@@ -823,19 +920,12 @@ export default function AdminDashboardPage() {
                       </button>
                     </div>
                     <div className="flex items-center gap-2">
-                      {s.enabled ? (
+                      {s.enabled && (
                         <button
                           onClick={() => updateVotingSession(s.id, { enabled: false })}
                           className="text-sm bg-red-100 text-red-700 px-3 py-1 rounded hover:bg-red-200"
                         >
                           Disable
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => updateVotingSession(s.id, { enabled: true })}
-                          className="text-sm bg-green-100 text-green-700 px-3 py-1 rounded hover:bg-green-200"
-                        >
-                          Enable
                         </button>
                       )}
                       <span className="text-sm text-gray-600">
@@ -904,19 +994,12 @@ export default function AdminDashboardPage() {
                 className="border rounded px-2 py-1"
               >
                 <option value="">Select a session</option>
-                {votingSessions.map((s) => (
+                {votingSessions.filter(s => s.enabled).map((s) => (
                   <option key={s.id} value={s.id}>{s.sessionDescription}</option>
                 ))}
               </select>
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={resetVotes}
-                disabled={status.saving || !selectedSessionId}
-                className="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
-              >
-                Reset Votes
-              </button>
               <button
                 onClick={downloadVotingResults}
                 disabled={status.saving || !selectedSessionId}
@@ -945,6 +1028,40 @@ export default function AdminDashboardPage() {
                     className="bg-brand text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
                   >
                     Start Timer
+                  </button>
+                  {(() => {
+                    const session = votingSessions.find((s) => s.id === selectedSessionId);
+                    if (session?.timerEnd) {
+                      // Timer is running - show pause button
+                      return (
+                        <button
+                          onClick={pauseTimer}
+                          disabled={status.saving}
+                          className="bg-yellow-500 text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
+                        >
+                          Pause
+                        </button>
+                      );
+                    } else if (session?.remainingMinutes) {
+                      // Timer is paused - show continue button
+                      return (
+                        <button
+                          onClick={continueTimer}
+                          disabled={status.saving}
+                          className="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
+                        >
+                          Continue
+                        </button>
+                      );
+                    }
+                    return null;
+                  })()}
+                  <button
+                    onClick={resetVotes}
+                    disabled={status.saving || !selectedSessionId}
+                    className="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
+                  >
+                    Reset
                   </button>
                 </div>
                 {countdown !== null && (
@@ -1044,8 +1161,9 @@ export default function AdminDashboardPage() {
                     <td className="p-3">{s.sessionDescription}</td>
                     <td className="p-3">{s.totalVotes || 0}</td>
                     <td className="p-3">
-                      {!s.timerEnd ? 'Not yet started' : 
-                       (new Date() < new Date(s.timerEnd) ? 'Active' : 'Ended')}
+                      {s.remainingMinutes ? 'Paused' :
+                       (!s.timerEnd ? 'Not yet started' : 
+                       (new Date() < new Date(s.timerEnd) ? 'Active' : 'Ended'))}
                     </td>
                   </tr>
                 ))}

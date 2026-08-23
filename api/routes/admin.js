@@ -244,6 +244,7 @@ router.get('/voting-sessions', authenticate, requireAdmin, async (req, res, next
       groups: s.groups,
       enabled: s.enabled,
       timerEnd: s.timerEnd,
+      remainingMinutes: s.remainingMinutes,
       createdAt: s.createdAt,
       totalVotes: countMap.get(s._id.toString()) || 0
     })));
@@ -305,14 +306,25 @@ router.delete('/voting-sessions/:id', authenticate, requireAdmin, async (req, re
 router.post('/voting-sessions/:id/timer', authenticate, requireAdmin, async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { durationMinutes } = req.body || {};
+    const { durationMinutes, paused } = req.body || {};
     const duration = Number(durationMinutes) || 0;
-    const timerEnd = duration > 0 ? new Date(Date.now() + duration * 60 * 1000).toISOString() : null;
-    await getVotingSessionsCollection().updateOne(
-      { _id: new ObjectId(id) },
-      { $set: { timerEnd } }
-    );
-    res.json({ success: true, timerEnd });
+    
+    if (paused) {
+      // Pause: clear timerEnd but store remaining time
+      await getVotingSessionsCollection().updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { timerEnd: null, remainingMinutes: duration } }
+      );
+      res.json({ success: true, timerEnd: null, remainingMinutes: duration });
+    } else {
+      // Start or continue: set timerEnd based on duration
+      const timerEnd = duration > 0 ? new Date(Date.now() + duration * 60 * 1000).toISOString() : null;
+      await getVotingSessionsCollection().updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { timerEnd, remainingMinutes: null } }
+      );
+      res.json({ success: true, timerEnd });
+    }
   } catch (err) {
     next(err);
   }
@@ -324,7 +336,7 @@ router.post('/voting-sessions/:id/reset', authenticate, requireAdmin, async (req
     await getVotesCollection().deleteMany({ sessionId: id });
     await getVotingSessionsCollection().updateOne(
       { _id: new ObjectId(id) },
-      { $set: { timerEnd: null } }
+      { $set: { timerEnd: null, remainingMinutes: null } }
     );
     res.json({ success: true });
   } catch (err) {
