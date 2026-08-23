@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import api from '../api';
 import EditableList from '../components/EditableList';
 import Loading from '../components/Loading';
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, LabelList } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
 const TABS = ['schedule', 'restaurant', 'poc', 'groups', 'registrations', 'voting-groups', 'voting-results'];
 const TAB_LABELS = {
@@ -1237,6 +1237,7 @@ export default function AdminDashboardPage() {
                         cy="50%"
                         outerRadius={80}
                         labelLine={true}
+                        label
                       >
                         {votingResults.results.map((entry, index) => {
                           const dellColors = [
@@ -1258,7 +1259,6 @@ export default function AdminDashboardPage() {
                             />
                           );
                         })}
-                        <LabelList dataKey="name" position="outside" formatter={(name, entry) => `${name}: ${entry.votes}`} />
                       </Pie>
                       <Tooltip />
                       <Legend />
