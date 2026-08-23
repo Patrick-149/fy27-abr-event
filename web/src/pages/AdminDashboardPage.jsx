@@ -113,12 +113,16 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     if (tab !== 'voting-results' || !selectedSessionId) return;
+    const session = votingSessions.find((s) => s.id === selectedSessionId);
+    // Only auto-refresh if timer has been started
+    if (!session?.timerEnd) return;
+    
     loadVotingResults();
     const interval = setInterval(() => {
       loadVotingResults();
     }, 5000);
     return () => clearInterval(interval);
-  }, [tab, selectedSessionId]);
+  }, [tab, selectedSessionId, votingSessions]);
 
   useEffect(() => {
     const session = votingSessions.find((s) => s.id === selectedSessionId);
@@ -1016,7 +1020,8 @@ export default function AdminDashboardPage() {
                     <td className="p-3">{s.sessionDescription}</td>
                     <td className="p-3">{s.totalVotes || 0}</td>
                     <td className="p-3">
-                      {s.enabled ? (s.timerEnd && new Date() < new Date(s.timerEnd) ? 'Active' : 'Ended') : 'Disabled'}
+                      {!s.timerEnd ? 'Not yet started' : 
+                       (new Date() < new Date(s.timerEnd) ? 'Active' : 'Ended')}
                     </td>
                   </tr>
                 ))}

@@ -64,7 +64,7 @@ export default function VotingPage() {
       <h2 className="text-2xl font-bold text-gray-900 mb-4">Voting</h2>
       {config.sessionDescription && (
         <div className="bg-blue-50 border border-blue-200 text-blue-800 p-4 rounded-lg mb-4">
-          {config.sessionDescription}
+          <div className="font-semibold">Session: {config.sessionDescription}</div>
         </div>
       )}
       {!isTimerStarted && (
