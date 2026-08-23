@@ -74,12 +74,12 @@ export default function AdminDashboardPage() {
     const load = async () => {
       try {
         const [s, r, rr, p, g, reg] = await Promise.all([
-          api.get('/api/admin/schedule').catch(e => { console.error('Schedule error:', e); return { data: [] }; }),
-          api.get('/api/admin/restaurant').catch(e => { console.error('Restaurant error:', e); return { data: {} }; }),
-          api.get('/api/admin/restrooms').catch(e => { console.error('Restrooms error:', e); return { data: [] }; }),
-          api.get('/api/admin/poc').catch(e => { console.error('POC error:', e); return { data: [] }; }),
-          api.get('/api/admin/groups').catch(e => { console.error('Groups error:', e); return { data: [] }; }),
-          api.get('/api/admin/registrations').catch(e => { console.error('Registrations error:', e); return { data: [] }; })
+          api.get('/api/admin/schedule'),
+          api.get('/api/admin/restaurant'),
+          api.get('/api/admin/restrooms'),
+          api.get('/api/admin/poc'),
+          api.get('/api/admin/groups'),
+          api.get('/api/admin/registrations')
         ]);
         setSchedule(s.data);
         setRestaurant({
@@ -94,19 +94,16 @@ export default function AdminDashboardPage() {
         setPoc(p.data);
         setGroups(g.data);
         setRegistrations(reg.data);
-        try {
-          const vs = await api.get('/api/admin/voting-sessions');
-          setVotingSessions(vs.data);
-          if (vs.data.length > 0) {
-            setSelectedSessionId(vs.data[0].id);
-          }
-        } catch (vsErr) {
-          console.error('Failed to load voting sessions:', vsErr);
-          setVotingSessions([]);
+        
+        const vs = await api.get('/api/admin/voting-sessions');
+        setVotingSessions(vs.data);
+        if (vs.data.length > 0) {
+          setSelectedSessionId(vs.data[0].id);
         }
       } catch (err) {
         console.error('Admin data load error:', err);
-        setStatus({ saving: false, message: '', error: 'Failed to load admin data.' });
+        const errorMessage = err.response?.data?.message || err.message || 'Failed to load admin data';
+        setStatus({ saving: false, message: '', error: errorMessage });
       } finally {
         setLoading(false);
       }

@@ -18,7 +18,7 @@ export default defineConfig({
         display: 'standalone',
         scope: '/',
         start_url: '/',
-        version: '2.0.0',
+        version: '2.1.0',
         icons: [
           {
             src: '/icons/icon-192x192.png',
@@ -46,15 +46,17 @@ export default defineConfig({
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-cache',
+              networkTimeoutSeconds: 10,
               expiration: {
                 maxEntries: 50,
-                maxAgeSeconds: 300
+                maxAgeSeconds: 60
               }
             }
           }
         ],
         clientsClaim: true,
-        skipWaiting: true
+        skipWaiting: true,
+        cleanupOutdatedCaches: true
       },
       devOptions: {
         enabled: false
