@@ -1236,7 +1236,13 @@ export default function AdminDashboardPage() {
                         cx="50%"
                         cy="50%"
                         outerRadius={80}
-                        label={({ name, votes }) => `${name}: ${votes}`}
+                        labelLine={false}
+                        label={({ name, votes, percent }) => `${name}: ${votes} (${(percent * 100).toFixed(0)}%)`}
+                        labelStyle={{
+                          fontSize: '12px',
+                          fontWeight: 'bold',
+                          fill: '#333'
+                        }}
                       >
                         {votingResults.results.map((entry, index) => {
                           const dellColors = [
