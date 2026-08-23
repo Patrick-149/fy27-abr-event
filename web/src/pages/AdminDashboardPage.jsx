@@ -66,6 +66,7 @@ export default function AdminDashboardPage() {
   const [countdown, setCountdown] = useState(null);
   const [newSessionDescription, setNewSessionDescription] = useState('');
   const [sessionToEnable, setSessionToEnable] = useState('');
+  const [timerExpired, setTimerExpired] = useState(false);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({ saving: false, message: '', error: '' });
   const [uploadFile, setUploadFile] = useState(null);
@@ -115,11 +116,27 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     if (tab !== 'voting-results' || !selectedSessionId) return;
     const session = votingSessions.find((s) => s.id === selectedSessionId);
-    // Only auto-refresh if timer is running (timerEnd exists)
+    // Only auto-refresh if timer is running (timerEnd exists and not expired)
     if (!session?.timerEnd) return;
     
+    // Check if timer has already expired
+    const now = new Date();
+    const end = new Date(session.timerEnd);
+    if (now >= end) {
+      setTimerExpired(true);
+      return;
+    }
+    
+    setTimerExpired(false);
     loadVotingResults();
     const interval = setInterval(() => {
+      const currentSession = votingSessions.find((s) => s.id === selectedSessionId);
+      // Stop auto-refresh if timer has expired
+      if (!currentSession?.timerEnd || new Date() >= new Date(currentSession.timerEnd)) {
+        clearInterval(interval);
+        setTimerExpired(true);
+        return;
+      }
       loadVotingResults();
     }, 5000);
     return () => clearInterval(interval);
@@ -488,6 +505,7 @@ export default function AdminDashboardPage() {
       setVotingSessions(sessions);
       setTimerDuration('');
       setCountdown(null);
+      setTimerExpired(false);
       setStatus({ saving: false, message: 'Votes reset.', error: '' });
     } catch {
       setStatus({ saving: false, message: '', error: 'Failed to reset votes.' });
@@ -939,7 +957,18 @@ export default function AdminDashboardPage() {
           </div>
           {selectedSessionId && (
             <div className="bg-white rounded-xl p-4 shadow space-y-3 mb-4">
-              <h3 className="font-bold text-lg">Session Groups</h3>
+              <div className="flex justify-between items-center">
+                <h3 className="font-bold text-lg">Session Groups</h3>
+                <select
+                  value={selectedSessionId}
+                  onChange={(e) => setSelectedSessionId(e.target.value)}
+                  className="border rounded px-2 py-1"
+                >
+                  {votingSessions.filter(s => s.enabled).map((s) => (
+                    <option key={s.id} value={s.id}>{s.sessionDescription}</option>
+                  ))}
+                </select>
+              </div>
               {(() => {
                 const session = votingSessions.find((s) => s.id === selectedSessionId);
                 if (!session) return null;
@@ -1022,6 +1051,7 @@ export default function AdminDashboardPage() {
                     placeholder="Minutes"
                     min="1"
                   />
+                  <span className="text-sm text-gray-600">(mins)</span>
                   <button
                     onClick={startTimer}
                     disabled={status.saving || !timerDuration}
