@@ -18,6 +18,7 @@ export default defineConfig({
         display: 'standalone',
         scope: '/',
         start_url: '/',
+        version: '2.0.0',
         icons: [
           {
             src: '/icons/icon-192x192.png',
@@ -51,7 +52,9 @@ export default defineConfig({
               }
             }
           }
-        ]
+        ],
+        clientsClaim: true,
+        skipWaiting: true
       },
       devOptions: {
         enabled: false

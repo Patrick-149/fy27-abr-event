@@ -74,12 +74,12 @@ export default function AdminDashboardPage() {
     const load = async () => {
       try {
         const [s, r, rr, p, g, reg] = await Promise.all([
-          api.get('/api/admin/schedule'),
-          api.get('/api/admin/restaurant'),
-          api.get('/api/admin/restrooms'),
-          api.get('/api/admin/poc'),
-          api.get('/api/admin/groups'),
-          api.get('/api/admin/registrations')
+          api.get('/api/admin/schedule').catch(e => { console.error('Schedule error:', e); return { data: [] }; }),
+          api.get('/api/admin/restaurant').catch(e => { console.error('Restaurant error:', e); return { data: {} }; }),
+          api.get('/api/admin/restrooms').catch(e => { console.error('Restrooms error:', e); return { data: [] }; }),
+          api.get('/api/admin/poc').catch(e => { console.error('POC error:', e); return { data: [] }; }),
+          api.get('/api/admin/groups').catch(e => { console.error('Groups error:', e); return { data: [] }; }),
+          api.get('/api/admin/registrations').catch(e => { console.error('Registrations error:', e); return { data: [] }; })
         ]);
         setSchedule(s.data);
         setRestaurant({
@@ -104,7 +104,8 @@ export default function AdminDashboardPage() {
           console.error('Failed to load voting sessions:', vsErr);
           setVotingSessions([]);
         }
-      } catch {
+      } catch (err) {
+        console.error('Admin data load error:', err);
         setStatus({ saving: false, message: '', error: 'Failed to load admin data.' });
       } finally {
         setLoading(false);
