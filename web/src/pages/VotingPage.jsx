@@ -56,7 +56,7 @@ export default function VotingPage() {
     );
   }
 
-  const isVotingOpen = config.timerEnd && new Date() < new Date(config.timerEnd);
+  const isVotingOpen = config.votingOpen || (config.timerEnd && new Date() < new Date(config.timerEnd));
   const isTimerStarted = !!config.timerEnd;
 
   return (

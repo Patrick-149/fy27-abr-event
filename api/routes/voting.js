@@ -5,20 +5,25 @@ const router = Router();
 
 router.get('/config', async (req, res, next) => {
   try {
-    const session = await getVotingSessionsCollection().findOne({ enabled: true, timerEnd: { $ne: null } });
+    const session = await getVotingSessionsCollection().findOne({ enabled: true });
     if (!session) {
       return res.json({ groups: [], enabled: false, timerEnd: null, sessionDescription: '' });
     }
-    const now = new Date();
-    const timerEnd = new Date(session.timerEnd);
-    if (now > timerEnd) {
-      return res.json({ groups: [], enabled: false, timerEnd: null, sessionDescription: '' });
+    
+    // Check if timer has been set and not expired
+    let votingOpen = false;
+    if (session.timerEnd) {
+      const now = new Date();
+      const timerEnd = new Date(session.timerEnd);
+      votingOpen = now <= timerEnd;
     }
+    
     res.json({
       groups: session.groups || [],
       enabled: session.enabled,
       timerEnd: session.timerEnd,
-      sessionDescription: session.sessionDescription || ''
+      sessionDescription: session.sessionDescription || '',
+      votingOpen
     });
   } catch (err) {
     next(err);
