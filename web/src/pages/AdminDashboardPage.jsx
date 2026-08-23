@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import api from '../api';
 import EditableList from '../components/EditableList';
 import Loading from '../components/Loading';
@@ -67,6 +67,7 @@ export default function AdminDashboardPage() {
   const [newSessionDescription, setNewSessionDescription] = useState('');
   const [sessionToEnable, setSessionToEnable] = useState('');
   const [timerExpired, setTimerExpired] = useState(false);
+  const autoRefreshIntervalRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({ saving: false, message: '', error: '' });
   const [uploadFile, setUploadFile] = useState(null);
@@ -114,6 +115,12 @@ export default function AdminDashboardPage() {
   }, []);
 
   useEffect(() => {
+    // Clear any existing auto-refresh when tab changes or session changes
+    if (autoRefreshIntervalRef.current) {
+      clearInterval(autoRefreshIntervalRef.current);
+      autoRefreshIntervalRef.current = null;
+    }
+    
     if (tab !== 'voting-results' || !selectedSessionId) return;
     const session = votingSessions.find((s) => s.id === selectedSessionId);
     
@@ -130,11 +137,12 @@ export default function AdminDashboardPage() {
     }
     
     loadVotingResults();
-    const interval = setInterval(() => {
+    autoRefreshIntervalRef.current = setInterval(() => {
       const currentSession = votingSessions.find((s) => s.id === selectedSessionId);
       // Stop auto-refresh if timer has been reset (no timerEnd and no remainingMinutes)
       if (!currentSession?.timerEnd && !currentSession?.remainingMinutes) {
-        clearInterval(interval);
+        clearInterval(autoRefreshIntervalRef.current);
+        autoRefreshIntervalRef.current = null;
         setTimerExpired(false);
         return;
       }
@@ -145,7 +153,12 @@ export default function AdminDashboardPage() {
         setVotingSessions(sessions);
       }).catch(err => console.error('Failed to refresh sessions:', err));
     }, 5000);
-    return () => clearInterval(interval);
+    return () => {
+      if (autoRefreshIntervalRef.current) {
+        clearInterval(autoRefreshIntervalRef.current);
+        autoRefreshIntervalRef.current = null;
+      }
+    };
   }, [tab, selectedSessionId, votingSessions]);
 
   useEffect(() => {
@@ -442,6 +455,13 @@ export default function AdminDashboardPage() {
     }
     const duration = Number(timerDuration);
     if (!duration || duration <= 0) return;
+    
+    // Clear auto-refresh interval before starting timer to prevent conflicts
+    if (autoRefreshIntervalRef.current) {
+      clearInterval(autoRefreshIntervalRef.current);
+      autoRefreshIntervalRef.current = null;
+    }
+    
     setStatus({ saving: true, message: '', error: '' });
     try {
       const { data } = await api.post(`/api/admin/voting-sessions/${selectedSessionId}/timer`, { durationMinutes: duration });
@@ -455,6 +475,13 @@ export default function AdminDashboardPage() {
 
   const pauseTimer = async () => {
     if (!selectedSessionId) return;
+    
+    // Clear auto-refresh interval before pausing timer to prevent conflicts
+    if (autoRefreshIntervalRef.current) {
+      clearInterval(autoRefreshIntervalRef.current);
+      autoRefreshIntervalRef.current = null;
+    }
+    
     setStatus({ saving: true, message: '', error: '' });
     try {
       const session = votingSessions.find((s) => s.id === selectedSessionId);
@@ -484,6 +511,12 @@ export default function AdminDashboardPage() {
   const continueTimer = async () => {
     if (!selectedSessionId) return;
     const session = votingSessions.find((s) => s.id === selectedSessionId);
+    
+    // Clear auto-refresh interval before continuing timer to prevent conflicts
+    if (autoRefreshIntervalRef.current) {
+      clearInterval(autoRefreshIntervalRef.current);
+      autoRefreshIntervalRef.current = null;
+    }
     
     // Use remainingMinutes if available (paused state), otherwise use input
     const duration = session?.remainingMinutes ? session.remainingMinutes : Number(timerDuration);
@@ -527,6 +560,13 @@ export default function AdminDashboardPage() {
 
   const resetTimer = async () => {
     if (!selectedSessionId) return;
+    
+    // Clear auto-refresh interval before resetting timer to prevent conflicts
+    if (autoRefreshIntervalRef.current) {
+      clearInterval(autoRefreshIntervalRef.current);
+      autoRefreshIntervalRef.current = null;
+    }
+    
     setStatus({ saving: true, message: '', error: '' });
     try {
       await api.post(`/api/admin/voting-sessions/${selectedSessionId}/reset-timer`);
