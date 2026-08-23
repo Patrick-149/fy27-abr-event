@@ -40,7 +40,9 @@ router.post('/submit', async (req, res, next) => {
     if (now > timerEnd) {
       return res.status(403).json({ message: 'Voting has ended' });
     }
-    const registration = await getRegistrationsCollection().findOne({ email: email.trim().toLowerCase() });
+    const registration = await getRegistrationsCollection().findOne({ 
+      email: { $regex: new RegExp(`^${email.trim()}$`, 'i') }
+    });
     if (!registration) {
       return res.status(400).json({ message: 'Email not found in registration list' });
     }
