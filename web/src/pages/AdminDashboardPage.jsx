@@ -59,9 +59,10 @@ export default function AdminDashboardPage() {
   const [selectedRegistrationIds, setSelectedRegistrationIds] = useState(new Set());
   const [groups, setGroups] = useState([]);
   const [selectedGroupIds, setSelectedGroupIds] = useState(new Set());
-  const [votingConfig, setVotingConfig] = useState({ groups: [], description: '', enabled: false, timerEnd: null });
+  const [votingConfig, setVotingConfig] = useState({ groups: [], description: '', sessionDescription: '', enabled: false, timerEnd: null });
   const [votingResults, setVotingResults] = useState({ results: [], timerEnd: null, totalVotes: 0 });
   const [timerDuration, setTimerDuration] = useState('');
+  const [countdown, setCountdown] = useState(null);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({ saving: false, message: '', error: '' });
   const [uploadFile, setUploadFile] = useState(null);
@@ -101,6 +102,40 @@ export default function AdminDashboardPage() {
     };
     load();
   }, []);
+
+  useEffect(() => {
+    if (tab !== 'voting-results') return;
+    loadVotingResults();
+    const interval = setInterval(() => {
+      loadVotingResults();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [tab]);
+
+  useEffect(() => {
+    if (!votingConfig.timerEnd) {
+      setCountdown(null);
+      return;
+    }
+    const updateCountdown = () => {
+      const now = new Date();
+      const end = new Date(votingConfig.timerEnd);
+      const diff = end - now;
+      if (diff <= 0) {
+        setCountdown('00:00:00');
+        return;
+      }
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+      setCountdown(
+        `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+      );
+    };
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, [votingConfig.timerEnd]);
 
   const setMessage = (message, error = '') => {
     setStatus({ saving: false, message, error });
@@ -677,19 +712,28 @@ export default function AdminDashboardPage() {
           <div className="bg-white rounded-xl p-4 shadow space-y-3 mb-4">
             <h3 className="font-bold text-lg">Voting Groups</h3>
             {votingConfig.groups.map((g) => (
-              <div key={g.id} className="flex gap-2 items-center">
-                <input
-                  value={g.name}
-                  onChange={(e) => updateVotingGroup(g.id, 'name', e.target.value)}
-                  className="flex-1 border rounded px-2 py-1"
-                  placeholder="Group name"
+              <div key={g.id} className="border rounded-lg p-3 space-y-2">
+                <div className="flex gap-2 items-center">
+                  <input
+                    value={g.name}
+                    onChange={(e) => updateVotingGroup(g.id, 'name', e.target.value)}
+                    className="flex-1 border rounded px-2 py-1"
+                    placeholder="Group name"
+                  />
+                  <button
+                    onClick={() => removeVotingGroup(g.id)}
+                    className="text-red-600 text-sm hover:underline"
+                  >
+                    Remove
+                  </button>
+                </div>
+                <textarea
+                  value={g.description || ''}
+                  onChange={(e) => updateVotingGroup(g.id, 'description', e.target.value)}
+                  className="w-full border rounded px-2 py-1 text-sm"
+                  rows={2}
+                  placeholder="Group description"
                 />
-                <button
-                  onClick={() => removeVotingGroup(g.id)}
-                  className="text-red-600 text-sm hover:underline"
-                >
-                  Remove
-                </button>
               </div>
             ))}
             <button
@@ -700,13 +744,13 @@ export default function AdminDashboardPage() {
             </button>
           </div>
           <div className="bg-white rounded-xl p-4 shadow space-y-3 mb-4">
-            <h3 className="font-bold text-lg">Description</h3>
+            <h3 className="font-bold text-lg">Voting Session Description</h3>
             <textarea
-              value={votingConfig.description}
-              onChange={(e) => setVotingConfig({ ...votingConfig, description: e.target.value })}
+              value={votingConfig.sessionDescription}
+              onChange={(e) => setVotingConfig({ ...votingConfig, sessionDescription: e.target.value })}
               className="w-full border rounded px-3 py-2"
               rows={3}
-              placeholder="Free text about group name/group member"
+              placeholder="Free text about the voting session"
             />
           </div>
           <div className="bg-white rounded-xl p-4 shadow space-y-3 mb-4">
@@ -732,14 +776,7 @@ export default function AdminDashboardPage() {
 
       {tab === 'voting-results' && (
         <div>
-          <div className="flex justify-between items-center mb-4">
-            <button
-              onClick={loadVotingResults}
-              disabled={status.saving}
-              className="bg-brand text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
-            >
-              Refresh Results
-            </button>
+          <div className="flex justify-end mb-4">
             <button
               onClick={downloadVotingResults}
               disabled={status.saving}
@@ -774,8 +811,13 @@ export default function AdminDashboardPage() {
                 Reset
               </button>
             </div>
+            {countdown !== null && (
+              <div className="text-3xl font-mono font-bold text-center text-brand mt-4">
+                {countdown}
+              </div>
+            )}
             {votingConfig.timerEnd && (
-              <div className="text-sm text-gray-600">
+              <div className="text-sm text-gray-600 text-center">
                 Timer ends at: {new Date(votingConfig.timerEnd).toLocaleString()}
               </div>
             )}
@@ -794,9 +836,26 @@ export default function AdminDashboardPage() {
                     outerRadius={80}
                     label
                   >
-                    {votingResults.results.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={`hsl(${index * 360 / votingResults.results.length}, 70%, 50%)`} />
-                    ))}
+                    {votingResults.results.map((entry, index) => {
+                      const dellColors = [
+                        '#007DB8',
+                        '#76B900',
+                        '#FF6600',
+                        '#E4002B',
+                        '#8C1D82',
+                        '#00A9F4',
+                        '#FFC107',
+                        '#795548',
+                        '#607D8B',
+                        '#9C27B0'
+                      ];
+                      return (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={dellColors[index % dellColors.length]}
+                        />
+                      );
+                    })}
                   </Pie>
                   <Tooltip />
                   <Legend />

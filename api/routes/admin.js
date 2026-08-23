@@ -224,7 +224,7 @@ router.delete('/groups', authenticate, requireAdmin, async (req, res, next) => {
 router.get('/voting-config', authenticate, requireAdmin, async (req, res, next) => {
   try {
     const config = await getVotingGroupsCollection().findOne({ _id: 'config' });
-    res.json(config || { _id: 'config', groups: [], description: '', enabled: false, timerEnd: null });
+    res.json(config || { _id: 'config', groups: [], description: '', sessionDescription: '', enabled: false, timerEnd: null });
   } catch (err) {
     next(err);
   }
@@ -232,10 +232,10 @@ router.get('/voting-config', authenticate, requireAdmin, async (req, res, next) 
 
 router.put('/voting-config', authenticate, requireAdmin, async (req, res, next) => {
   try {
-    const { groups, description, enabled } = req.body || {};
+    const { groups, description, sessionDescription, enabled } = req.body || {};
     await getVotingGroupsCollection().updateOne(
       { _id: 'config' },
-      { $set: { groups: groups || [], description: description || '', enabled: !!enabled } },
+      { $set: { groups: groups || [], description: description || '', sessionDescription: sessionDescription || '', enabled: !!enabled } },
       { upsert: true }
     );
     res.json({ success: true });
@@ -285,9 +285,12 @@ router.get('/voting-results', authenticate, requireAdmin, async (req, res, next)
 router.get('/voting-export', authenticate, requireAdmin, async (req, res, next) => {
   try {
     const votes = await getVotesCollection().find().sort({ votedAt: 1 }).toArray();
+    const config = await getVotingGroupsCollection().findOne({ _id: 'config' });
+    const groupMap = new Map((config?.groups || []).map((g) => [g.id, g.description || '']));
     const rows = votes.map((v) => ({
       'Email': v.email,
       'Group': v.groupName,
+      'Group Description': groupMap.get(v.groupId) || '',
       'Voted At': v.votedAt instanceof Date ? v.votedAt.toISOString() : v.votedAt
     }));
     const worksheet = xlsx.utils.json_to_sheet(rows);

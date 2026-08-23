@@ -56,17 +56,23 @@ export default function VotingPage() {
     );
   }
 
-  const isVotingOpen = !config.timerEnd || new Date() < new Date(config.timerEnd);
+  const isVotingOpen = config.timerEnd && new Date() < new Date(config.timerEnd);
+  const isTimerStarted = !!config.timerEnd;
 
   return (
     <div>
       <h2 className="text-2xl font-bold text-gray-900 mb-4">Voting</h2>
-      {config.description && (
+      {config.sessionDescription && (
         <div className="bg-blue-50 border border-blue-200 text-blue-800 p-4 rounded-lg mb-4">
-          {config.description}
+          {config.sessionDescription}
         </div>
       )}
-      {!isVotingOpen && (
+      {!isTimerStarted && (
+        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-4 rounded-lg mb-4">
+          Voting has not started yet. Please wait for the admin to start the timer.
+        </div>
+      )}
+      {isTimerStarted && !isVotingOpen && (
         <div className="bg-red-50 border border-red-200 text-red-800 p-4 rounded-lg mb-4">
           Voting has ended.
         </div>
@@ -88,7 +94,12 @@ export default function VotingPage() {
                   disabled={!isVotingOpen}
                   className="mr-3"
                 />
-                <span className="font-medium">{g.name}</span>
+                <div className="flex-1">
+                  <span className="font-medium">{g.name}</span>
+                  {g.description && (
+                    <p className="text-sm text-gray-600 mt-1">{g.description}</p>
+                  )}
+                </div>
               </label>
             ))}
           </div>

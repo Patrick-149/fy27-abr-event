@@ -9,7 +9,8 @@ router.get('/config', async (req, res, next) => {
     const groups = votingGroups?.groups || [];
     const enabled = votingGroups?.enabled || false;
     const timerEnd = votingGroups?.timerEnd || null;
-    res.json({ groups, enabled, timerEnd });
+    const sessionDescription = votingGroups?.sessionDescription || '';
+    res.json({ groups, enabled, timerEnd, sessionDescription });
   } catch (err) {
     next(err);
   }
@@ -25,7 +26,10 @@ router.post('/submit', async (req, res, next) => {
     if (!config?.enabled) {
       return res.status(403).json({ message: 'Voting is not available' });
     }
-    if (config.timerEnd && new Date() > new Date(config.timerEnd)) {
+    if (!config.timerEnd) {
+      return res.status(403).json({ message: 'Voting has not started yet' });
+    }
+    if (new Date() > new Date(config.timerEnd)) {
       return res.status(403).json({ message: 'Voting has ended' });
     }
     const registration = await getRegistrationsCollection().findOne({ email: email.trim().toLowerCase() });
