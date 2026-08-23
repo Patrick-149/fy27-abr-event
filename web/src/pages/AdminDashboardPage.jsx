@@ -186,7 +186,15 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     // Load voting results when session is selected in voting results tab
     if (tab === 'voting-results' && selectedSessionId) {
-      loadVotingResults();
+      const loadResults = async () => {
+        try {
+          const { data } = await api.get(`/api/admin/voting-sessions/${selectedSessionId}/results`);
+          setVotingResults(data);
+        } catch (err) {
+          console.error('Failed to load voting results:', err);
+        }
+      };
+      loadResults();
     }
   }, [tab, selectedSessionId]);
 
