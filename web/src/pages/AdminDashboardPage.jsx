@@ -115,8 +115,8 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     if (tab !== 'voting-results' || !selectedSessionId) return;
     const session = votingSessions.find((s) => s.id === selectedSessionId);
-    // Only auto-refresh if timer has been started (running or paused)
-    if (!session?.timerEnd && !session?.remainingMinutes) return;
+    // Only auto-refresh if timer is running (timerEnd exists)
+    if (!session?.timerEnd) return;
     
     loadVotingResults();
     const interval = setInterval(() => {
