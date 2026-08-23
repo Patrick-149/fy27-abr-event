@@ -1245,7 +1245,7 @@ export default function AdminDashboardPage() {
                         cy="50%"
                         outerRadius={80}
                         labelLine={true}
-                        label
+                        label={(entry) => `${entry.name}: ${entry.votes}`}
                       >
                         {votingResults.results.map((entry, index) => {
                           const dellColors = [
