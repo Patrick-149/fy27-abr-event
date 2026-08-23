@@ -392,6 +392,11 @@ export default function AdminDashboardPage() {
 
   const startTimer = async () => {
     if (!selectedSessionId) return;
+    const session = votingSessions.find((s) => s.id === selectedSessionId);
+    if (!session?.enabled) {
+      setStatus({ saving: false, message: '', error: 'Cannot start timer: Session must be enabled first from the Voting Groups tab.' });
+      return;
+    }
     const duration = Number(timerDuration);
     if (!duration || duration <= 0) return;
     setStatus({ saving: true, message: '', error: '' });
