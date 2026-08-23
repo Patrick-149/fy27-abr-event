@@ -224,21 +224,18 @@ router.delete('/groups', authenticate, requireAdmin, async (req, res, next) => {
 router.get('/voting-sessions', authenticate, requireAdmin, async (req, res, next) => {
   try {
     const sessions = await getVotingSessionsCollection().find().sort({ createdAt: -1 }).toArray();
-    let voteCounts = [];
-    if (sessions.length > 0) {
-      const sessionIds = sessions.map((s) => s._id.toString());
-      try {
-        voteCounts = await getVotesCollection().aggregate([
-          { $match: { sessionId: { $in: sessionIds } } },
-          { $group: { _id: '$sessionId', count: { $sum: 1 } } }
-        ]).toArray();
-      } catch (aggErr) {
-        console.error('Aggregation error:', aggErr);
-        voteCounts = [];
-      }
-    }
-    const countMap = new Map(voteCounts.map((vc) => [vc._id, vc.count]));
-    res.json(sessions.map((s) => ({
+    
+    // Count votes for each session individually to ensure accuracy
+    const sessionsWithCounts = await Promise.all(sessions.map(async (session) => {
+      const sessionId = session._id.toString();
+      const voteCount = await getVotesCollection().countDocuments({ sessionId });
+      return {
+        ...session,
+        totalVotes: voteCount
+      };
+    }));
+    
+    res.json(sessionsWithCounts.map((s) => ({
       id: s._id.toString(),
       sessionDescription: s.sessionDescription,
       groups: s.groups,
@@ -246,7 +243,7 @@ router.get('/voting-sessions', authenticate, requireAdmin, async (req, res, next
       timerEnd: s.timerEnd,
       remainingMinutes: s.remainingMinutes,
       createdAt: s.createdAt,
-      totalVotes: countMap.get(s._id.toString()) || 0
+      totalVotes: s.totalVotes
     })));
   } catch (err) {
     console.error('Voting sessions error:', err);
