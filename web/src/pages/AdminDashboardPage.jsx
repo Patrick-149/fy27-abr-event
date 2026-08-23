@@ -1029,7 +1029,7 @@ export default function AdminDashboardPage() {
                 return (
                   <>
                     {session.groups.map((g) => (
-                      <div key={g.id} className="border rounded-lg p-3 space-y-2">
+                      <div key={g.id} className="border rounded-lg p-3">
                         <div className="flex gap-2 items-center">
                           <input
                             value={g.name}
@@ -1044,13 +1044,6 @@ export default function AdminDashboardPage() {
                             Remove
                           </button>
                         </div>
-                        <textarea
-                          value={g.description || ''}
-                          onChange={(e) => updateSessionGroup(selectedSessionId, g.id, 'description', e.target.value)}
-                          className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand resize-y min-h-[80px]"
-                          rows={4}
-                          placeholder="Group description"
-                        />
                       </div>
                     ))}
                     <button
