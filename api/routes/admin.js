@@ -6,7 +6,7 @@ import xlsx from 'xlsx';
 import { ObjectId } from 'mongodb';
 import { authenticate, requireAdmin } from '../auth.js';
 import { readJson, writeJson } from '../utils.js';
-import { getRegistrationsCollection, getGroupsCollection, getVotingGroupsCollection, getVotesCollection } from '../db.js';
+import { getRegistrationsCollection, getGroupsCollection, getVotingSessionsCollection, getVotesCollection } from '../db.js';
 
 const router = Router();
 
@@ -221,22 +221,60 @@ router.delete('/groups', authenticate, requireAdmin, async (req, res, next) => {
   }
 });
 
-router.get('/voting-config', authenticate, requireAdmin, async (req, res, next) => {
+router.get('/voting-sessions', authenticate, requireAdmin, async (req, res, next) => {
   try {
-    const config = await getVotingGroupsCollection().findOne({ _id: 'config' });
-    res.json(config || { _id: 'config', groups: [], description: '', sessionDescription: '', enabled: false, timerEnd: null });
+    const sessions = await getVotingSessionsCollection().find().sort({ createdAt: -1 }).toArray();
+    const sessionIds = sessions.map((s) => s._id.toString());
+    const voteCounts = await getVotesCollection().aggregate([
+      { $match: { sessionId: { $in: sessionIds } } },
+      { $group: { _id: '$sessionId', count: { $sum: 1 } } }
+    ]).toArray();
+    const countMap = new Map(voteCounts.map((vc) => [vc._id, vc.count]));
+    res.json(sessions.map((s) => ({
+      id: s._id.toString(),
+      sessionDescription: s.sessionDescription,
+      groups: s.groups,
+      enabled: s.enabled,
+      timerEnd: s.timerEnd,
+      createdAt: s.createdAt,
+      totalVotes: countMap.get(s._id.toString()) || 0
+    })));
   } catch (err) {
     next(err);
   }
 });
 
-router.put('/voting-config', authenticate, requireAdmin, async (req, res, next) => {
+router.post('/voting-sessions', authenticate, requireAdmin, async (req, res, next) => {
   try {
-    const { groups, description, sessionDescription, enabled } = req.body || {};
-    await getVotingGroupsCollection().updateOne(
-      { _id: 'config' },
-      { $set: { groups: groups || [], description: description || '', sessionDescription: sessionDescription || '', enabled: !!enabled } },
-      { upsert: true }
+    const { sessionDescription, groups } = req.body || {};
+    if (!sessionDescription) {
+      return res.status(400).json({ message: 'Session description is required' });
+    }
+    const session = {
+      sessionDescription,
+      groups: groups || [],
+      enabled: false,
+      timerEnd: null,
+      createdAt: new Date()
+    };
+    const { insertedId } = await getVotingSessionsCollection().insertOne(session);
+    res.json({ success: true, id: insertedId.toString() });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put('/voting-sessions/:id', authenticate, requireAdmin, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { sessionDescription, groups, enabled } = req.body || {};
+    const update = {};
+    if (sessionDescription !== undefined) update.sessionDescription = sessionDescription;
+    if (groups !== undefined) update.groups = groups;
+    if (enabled !== undefined) update.enabled = !!enabled;
+    await getVotingSessionsCollection().updateOne(
+      { _id: new ObjectId(id) },
+      { $set: update }
     );
     res.json({ success: true });
   } catch (err) {
@@ -244,15 +282,26 @@ router.put('/voting-config', authenticate, requireAdmin, async (req, res, next) 
   }
 });
 
-router.post('/voting-timer', authenticate, requireAdmin, async (req, res, next) => {
+router.delete('/voting-sessions/:id', authenticate, requireAdmin, async (req, res, next) => {
   try {
+    const { id } = req.params;
+    await getVotingSessionsCollection().deleteOne({ _id: new ObjectId(id) });
+    await getVotesCollection().deleteMany({ sessionId: id });
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/voting-sessions/:id/timer', authenticate, requireAdmin, async (req, res, next) => {
+  try {
+    const { id } = req.params;
     const { durationMinutes } = req.body || {};
     const duration = Number(durationMinutes) || 0;
     const timerEnd = duration > 0 ? new Date(Date.now() + duration * 60 * 1000).toISOString() : null;
-    await getVotingGroupsCollection().updateOne(
-      { _id: 'config' },
-      { $set: { timerEnd } },
-      { upsert: true }
+    await getVotingSessionsCollection().updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { timerEnd } }
     );
     res.json({ success: true, timerEnd });
   } catch (err) {
@@ -260,11 +309,29 @@ router.post('/voting-timer', authenticate, requireAdmin, async (req, res, next) 
   }
 });
 
-router.get('/voting-results', authenticate, requireAdmin, async (req, res, next) => {
+router.post('/voting-sessions/:id/reset', authenticate, requireAdmin, async (req, res, next) => {
   try {
-    const config = await getVotingGroupsCollection().findOne({ _id: 'config' });
-    const groups = config?.groups || [];
-    const votes = await getVotesCollection().find().toArray();
+    const { id } = req.params;
+    await getVotesCollection().deleteMany({ sessionId: id });
+    await getVotingSessionsCollection().updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { timerEnd: null } }
+    );
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/voting-sessions/:id/results', authenticate, requireAdmin, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const session = await getVotingSessionsCollection().findOne({ _id: new ObjectId(id) });
+    if (!session) {
+      return res.status(404).json({ message: 'Session not found' });
+    }
+    const groups = session.groups || [];
+    const votes = await getVotesCollection().find({ sessionId: id }).toArray();
     const voteCounts = new Map();
     votes.forEach((v) => {
       const count = voteCounts.get(v.groupId) || 0;
@@ -275,18 +342,21 @@ router.get('/voting-results', authenticate, requireAdmin, async (req, res, next)
       name: g.name,
       votes: voteCounts.get(g.id) || 0
     }));
-    const timerEnd = config?.timerEnd || null;
-    res.json({ results, timerEnd, totalVotes: votes.length });
+    res.json({ results, timerEnd: session.timerEnd, totalVotes: votes.length });
   } catch (err) {
     next(err);
   }
 });
 
-router.get('/voting-export', authenticate, requireAdmin, async (req, res, next) => {
+router.get('/voting-sessions/:id/export', authenticate, requireAdmin, async (req, res, next) => {
   try {
-    const votes = await getVotesCollection().find().sort({ votedAt: 1 }).toArray();
-    const config = await getVotingGroupsCollection().findOne({ _id: 'config' });
-    const groupMap = new Map((config?.groups || []).map((g) => [g.id, g.description || '']));
+    const { id } = req.params;
+    const session = await getVotingSessionsCollection().findOne({ _id: new ObjectId(id) });
+    if (!session) {
+      return res.status(404).json({ message: 'Session not found' });
+    }
+    const votes = await getVotesCollection().find({ sessionId: id }).sort({ votedAt: 1 }).toArray();
+    const groupMap = new Map((session.groups || []).map((g) => [g.id, g.description || '']));
     const rows = votes.map((v) => ({
       'Email': v.email,
       'Group': v.groupName,
