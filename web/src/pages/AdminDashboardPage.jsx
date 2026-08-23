@@ -184,6 +184,13 @@ export default function AdminDashboardPage() {
   }, [tab, selectedSessionId, votingSessions]);
 
   useEffect(() => {
+    // Load voting results when session is selected in voting results tab
+    if (tab === 'voting-results' && selectedSessionId) {
+      loadVotingResults();
+    }
+  }, [tab, selectedSessionId]);
+
+  useEffect(() => {
     const session = votingSessions.find((s) => s.id === selectedSessionId);
     
     // Handle paused state - show static remaining time
