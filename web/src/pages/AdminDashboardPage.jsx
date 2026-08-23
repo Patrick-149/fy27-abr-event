@@ -73,14 +73,13 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [s, r, rr, p, g, reg, vs] = await Promise.all([
+        const [s, r, rr, p, g, reg] = await Promise.all([
           api.get('/api/admin/schedule'),
           api.get('/api/admin/restaurant'),
           api.get('/api/admin/restrooms'),
           api.get('/api/admin/poc'),
           api.get('/api/admin/groups'),
-          api.get('/api/admin/registrations'),
-          api.get('/api/admin/voting-sessions')
+          api.get('/api/admin/registrations')
         ]);
         setSchedule(s.data);
         setRestaurant({
@@ -95,9 +94,15 @@ export default function AdminDashboardPage() {
         setPoc(p.data);
         setGroups(g.data);
         setRegistrations(reg.data);
-        setVotingSessions(vs.data);
-        if (vs.data.length > 0) {
-          setSelectedSessionId(vs.data[0].id);
+        try {
+          const vs = await api.get('/api/admin/voting-sessions');
+          setVotingSessions(vs.data);
+          if (vs.data.length > 0) {
+            setSelectedSessionId(vs.data[0].id);
+          }
+        } catch (vsErr) {
+          console.error('Failed to load voting sessions:', vsErr);
+          setVotingSessions([]);
         }
       } catch {
         setStatus({ saving: false, message: '', error: 'Failed to load admin data.' });
