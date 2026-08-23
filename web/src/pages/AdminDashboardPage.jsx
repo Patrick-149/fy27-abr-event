@@ -116,28 +116,34 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     if (tab !== 'voting-results' || !selectedSessionId) return;
     const session = votingSessions.find((s) => s.id === selectedSessionId);
-    // Only auto-refresh if timer is running (timerEnd exists and not expired)
-    if (!session?.timerEnd) return;
+    
+    // Auto-refresh if timer is running or has expired (to update final vote counts)
+    if (!session?.timerEnd && !session?.remainingMinutes) return;
     
     // Check if timer has already expired
     const now = new Date();
     const end = new Date(session.timerEnd);
     if (now >= end) {
       setTimerExpired(true);
-      return;
+    } else {
+      setTimerExpired(false);
     }
     
-    setTimerExpired(false);
     loadVotingResults();
     const interval = setInterval(() => {
       const currentSession = votingSessions.find((s) => s.id === selectedSessionId);
-      // Stop auto-refresh if timer has expired
-      if (!currentSession?.timerEnd || new Date() >= new Date(currentSession.timerEnd)) {
+      // Stop auto-refresh if timer has been reset (no timerEnd and no remainingMinutes)
+      if (!currentSession?.timerEnd && !currentSession?.remainingMinutes) {
         clearInterval(interval);
-        setTimerExpired(true);
+        setTimerExpired(false);
         return;
       }
+      // Continue auto-refresh even after timer ends to update final vote counts
       loadVotingResults();
+      // Also refresh sessions to update total votes in summary table
+      api.get('/api/admin/voting-sessions').then(({ data: sessions }) => {
+        setVotingSessions(sessions);
+      }).catch(err => console.error('Failed to refresh sessions:', err));
     }, 5000);
     return () => clearInterval(interval);
   }, [tab, selectedSessionId, votingSessions]);
@@ -169,6 +175,10 @@ export default function AdminDashboardPage() {
       const diff = end - now;
       if (diff <= 0) {
         setCountdown('00:00:00');
+        // Refresh voting sessions when timer ends to update total votes in summary table
+        api.get('/api/admin/voting-sessions').then(({ data: sessions }) => {
+          setVotingSessions(sessions);
+        }).catch(err => console.error('Failed to refresh sessions:', err));
         return;
       }
       const hours = Math.floor(diff / (1000 * 60 * 60));
@@ -496,7 +506,10 @@ export default function AdminDashboardPage() {
   };
 
   const resetVotes = async () => {
-    if (!selectedSessionId) return;
+    if (!selectedSessionId) {
+      setStatus({ saving: false, message: '', error: 'Please select a voting session first.' });
+      return;
+    }
     if (!window.confirm('Are you sure you want to reset all votes for this session?')) return;
     setStatus({ saving: true, message: '', error: '' });
     try {
