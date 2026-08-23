@@ -65,7 +65,6 @@ export default function AdminDashboardPage() {
   const [timerDuration, setTimerDuration] = useState('');
   const [countdown, setCountdown] = useState(null);
   const [newSessionDescription, setNewSessionDescription] = useState('');
-  const [sessionToEnable, setSessionToEnable] = useState('');
   const [timerExpired, setTimerExpired] = useState(false);
   const autoRefreshIntervalRef = useRef(null);
   const [loading, setLoading] = useState(true);
@@ -982,85 +981,6 @@ export default function AdminDashboardPage() {
               </button>
             </div>
           </div>
-          <div className="bg-white rounded-xl p-4 shadow space-y-3 mb-4">
-            <h3 className="font-bold text-lg">Enable/Disable Sessions</h3>
-            <div className="flex gap-2 items-center">
-              <select
-                value={sessionToEnable}
-                onChange={(e) => setSessionToEnable(e.target.value)}
-                className="flex-1 border rounded px-2 py-1"
-              >
-                <option value="">Select a session to enable</option>
-                {votingSessions.filter(s => !s.enabled).map((s) => (
-                  <option key={s.id} value={s.id}>{s.sessionDescription}</option>
-                ))}
-              </select>
-              <button
-                onClick={() => {
-                  if (sessionToEnable) {
-                    updateVotingSession(sessionToEnable, { enabled: true });
-                    setSessionToEnable('');
-                  }
-                }}
-                disabled={status.saving || !sessionToEnable}
-                className="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
-              >
-                Enable Session
-              </button>
-            </div>
-          </div>
-          <div className="bg-white rounded-xl p-4 shadow space-y-3 mb-4">
-            <h3 className="font-bold text-lg">Sessions Status</h3>
-            {votingSessions.length === 0 ? (
-              <p className="text-gray-500">No sessions yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {votingSessions.map((s) => (
-                  <div key={s.id} className={`border rounded-lg p-3 ${s.enabled ? 'border-green-300 bg-green-50' : 'border-gray-300 bg-gray-50'}`}>
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium">{s.sessionDescription}</p>
-                          {s.enabled ? (
-                            <span className="text-xs bg-green-600 text-white px-2 py-0.5 rounded">Enabled</span>
-                          ) : (
-                            <span className="text-xs bg-gray-400 text-white px-2 py-0.5 rounded">Disabled</span>
-                          )}
-                        </div>
-                        <p className="text-sm text-gray-500">
-                          Created: {new Date(s.createdAt).toLocaleString()}
-                        </p>
-                        {s.timerEnd && (
-                          <p className="text-sm text-gray-500">
-                            Timer ends: {new Date(s.timerEnd).toLocaleString()}
-                          </p>
-                        )}
-                      </div>
-                      <button
-                        onClick={() => deleteVotingSession(s.id)}
-                        className="text-red-600 text-sm hover:underline"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {s.enabled && (
-                        <button
-                          onClick={() => updateVotingSession(s.id, { enabled: false })}
-                          className="text-sm bg-red-100 text-red-700 px-3 py-1 rounded hover:bg-red-200"
-                        >
-                          Disable
-                        </button>
-                      )}
-                      <span className="text-sm text-gray-600">
-                        {s.enabled ? 'Session enabled' : 'Session disabled'}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
           {selectedSessionId && (
             <div className="bg-white rounded-xl p-4 shadow space-y-3 mb-4">
               <div className="flex justify-between items-center">
@@ -1070,7 +990,7 @@ export default function AdminDashboardPage() {
                   onChange={(e) => setSelectedSessionId(e.target.value)}
                   className="border rounded px-2 py-1"
                 >
-                  {votingSessions.filter(s => s.enabled).map((s) => (
+                  {votingSessions.map((s) => (
                     <option key={s.id} value={s.id}>{s.sessionDescription}</option>
                   ))}
                 </select>
@@ -1099,8 +1019,9 @@ export default function AdminDashboardPage() {
                         <textarea
                           value={g.description || ''}
                           onChange={(e) => updateSessionGroup(selectedSessionId, g.id, 'description', e.target.value)}
-                          className="w-full border rounded px-2 py-1 text-sm"
-                          rows={2}
+                          className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+                          rows={3}
+                          placeholder="Group description"
                           placeholder="Group description"
                         />
                       </div>
@@ -1140,7 +1061,7 @@ export default function AdminDashboardPage() {
                 <option value="">Select a session</option>
                 {votingSessions.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.sessionDescription} {s.enabled ? '✓' : ''}
+                    {s.sessionDescription}
                   </option>
                 ))}
               </select>
