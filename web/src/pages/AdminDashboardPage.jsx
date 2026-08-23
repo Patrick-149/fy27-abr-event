@@ -981,6 +981,34 @@ export default function AdminDashboardPage() {
               </button>
             </div>
           </div>
+          <div className="bg-white rounded-xl p-4 shadow space-y-3 mb-4">
+            <h3 className="font-bold text-lg">All Sessions</h3>
+            {votingSessions.length === 0 ? (
+              <p className="text-gray-500">No sessions yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {votingSessions.map((s) => (
+                  <div key={s.id} className="border rounded-lg p-3 flex justify-between items-center">
+                    <div>
+                      <p className="font-medium">{s.sessionDescription}</p>
+                      <p className="text-sm text-gray-500">
+                        Created: {new Date(s.createdAt).toLocaleString()}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        Groups: {s.groups?.length || 0}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => deleteVotingSession(s.id)}
+                      className="text-red-600 text-sm hover:underline"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           {selectedSessionId && (
             <div className="bg-white rounded-xl p-4 shadow space-y-3 mb-4">
               <div className="flex justify-between items-center">
@@ -1019,10 +1047,10 @@ export default function AdminDashboardPage() {
                         <textarea
                           value={g.description || ''}
                           onChange={(e) => updateSessionGroup(selectedSessionId, g.id, 'description', e.target.value)}
-                          className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
-                          rows={3}
+                          className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand resize-y min-h-[80px]"
+                          rows={4}
                           placeholder="Group description"
-                          placeholder="Group description"
+                        />
                         />
                       </div>
                     ))}
