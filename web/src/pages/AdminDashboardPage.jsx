@@ -124,14 +124,17 @@ export default function AdminDashboardPage() {
     if (tab !== 'voting-results' || !selectedSessionId) return;
     const session = votingSessions.find((s) => s.id === selectedSessionId);
     
-    // Auto-refresh if timer is running or has expired (to update final vote counts)
-    if (!session?.timerEnd && !session?.remainingMinutes) return;
+    // Auto-refresh only when timer is actively running (has timerEnd and not expired)
+    // Do not auto-refresh when paused (has remainingMinutes) or stopped/reset (no timerEnd and no remainingMinutes)
+    if (!session?.timerEnd || session?.remainingMinutes) return;
     
     // Check if timer has already expired
     const now = new Date();
     const end = new Date(session.timerEnd);
     if (now >= end) {
       setTimerExpired(true);
+      // Stop auto-refresh if timer has expired
+      return;
     } else {
       setTimerExpired(false);
     }
@@ -139,6 +142,12 @@ export default function AdminDashboardPage() {
     loadVotingResults();
     autoRefreshIntervalRef.current = setInterval(() => {
       const currentSession = votingSessions.find((s) => s.id === selectedSessionId);
+      // Stop auto-refresh if timer has been paused (has remainingMinutes)
+      if (currentSession?.remainingMinutes) {
+        clearInterval(autoRefreshIntervalRef.current);
+        autoRefreshIntervalRef.current = null;
+        return;
+      }
       // Stop auto-refresh if timer has been reset (no timerEnd and no remainingMinutes)
       if (!currentSession?.timerEnd && !currentSession?.remainingMinutes) {
         clearInterval(autoRefreshIntervalRef.current);
@@ -146,7 +155,20 @@ export default function AdminDashboardPage() {
         setTimerExpired(false);
         return;
       }
-      // Continue auto-refresh even after timer ends to update final vote counts
+      // Stop auto-refresh if timer has expired
+      const now = new Date();
+      const end = new Date(currentSession.timerEnd);
+      if (now >= end) {
+        clearInterval(autoRefreshIntervalRef.current);
+        autoRefreshIntervalRef.current = null;
+        setTimerExpired(true);
+        // Refresh sessions to update total votes when timer ends
+        api.get('/api/admin/voting-sessions').then(({ data: sessions }) => {
+          setVotingSessions(sessions);
+        }).catch(err => console.error('Failed to refresh sessions:', err));
+        return;
+      }
+      // Continue auto-refresh while timer is running
       loadVotingResults();
       // Also refresh sessions to update total votes in summary table
       api.get('/api/admin/voting-sessions').then(({ data: sessions }) => {
