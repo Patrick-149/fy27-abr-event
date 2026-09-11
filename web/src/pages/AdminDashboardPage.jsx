@@ -1191,12 +1191,25 @@ export default function AdminDashboardPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {votingResults.results.map((r) => (
-                      <tr key={r.id} className="border-t">
-                        <td className="p-3">{r.name}</td>
-                        <td className="p-3">{r.votes}</td>
-                      </tr>
-                    ))}
+                    {(() => {
+                      const session = votingSessions.find((s) => s.id === selectedSessionId);
+                      const isTimerEnded = session?.timerEnd && new Date() >= new Date(session.timerEnd);
+                      const maxVotes = Math.max(...votingResults.results.map(r => r.votes), 0);
+                      
+                      return votingResults.results.map((r) => (
+                        <tr key={r.id} className="border-t">
+                          <td className="p-3">
+                            {r.name}
+                            {isTimerEnded && r.votes > 0 && r.votes === maxVotes && (
+                              <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-yellow-400 text-yellow-900">
+                                🏆 Winner
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3">{r.votes}</td>
+                        </tr>
+                      ));
+                    })()}
                   </tbody>
                 </table>
                 <div className="mt-2 text-sm text-gray-600">
