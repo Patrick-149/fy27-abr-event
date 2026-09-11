@@ -2,7 +2,8 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import api from '../api';
 import EditableList from '../components/EditableList';
 import Loading from '../components/Loading';
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
+// Temporarily disabled Recharts due to build issues
+// import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
 const TABS = ['schedule', 'restaurant', 'groups', 'registrations', 'voting-groups', 'voting-results'];
 const TAB_LABELS = {
@@ -1181,43 +1182,48 @@ export default function AdminDashboardPage() {
               <div className="bg-white rounded-xl p-4 shadow mb-4">
                 <h3 className="font-bold text-lg mb-4">Vote Distribution</h3>
                 {votingResults.results.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={votingResults.results}
-                        dataKey="votes"
-                        nameKey="name"
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={80}
-                        labelLine={true}
-                        label={(entry) => `${entry.name}: ${entry.votes}`}
-                      >
-                        {votingResults.results.map((entry, index) => {
-                          const dellColors = [
-                            '#007DB8',
-                            '#76B900',
-                            '#FF6600',
-                            '#E4002B',
-                            '#8C1D82',
-                            '#00A9F4',
-                            '#FFC107',
-                            '#795548',
-                            '#607D8B',
-                            '#9C27B0'
-                          ];
-                          return (
-                            <Cell
-                              key={`cell-${index}`}
-                              fill={dellColors[index % dellColors.length]}
-                            />
-                          );
-                        })}
-                      </Pie>
-                      <Tooltip />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  <div className="space-y-2">
+                    {votingResults.results.map((entry, index) => {
+                      const dellColors = [
+                        '#007DB8',
+                        '#76B900',
+                        '#FF6600',
+                        '#E4002B',
+                        '#8C1D82',
+                        '#00A9F4',
+                        '#FFC107',
+                        '#795548',
+                        '#607D8B',
+                        '#9C27B0'
+                      ];
+                      const percentage = votingResults.totalVotes > 0 
+                        ? ((entry.votes / votingResults.totalVotes) * 100).toFixed(1)
+                        : 0;
+                      return (
+                        <div key={entry.id} className="flex items-center gap-3">
+                          <div 
+                            className="w-4 h-4 rounded"
+                            style={{ backgroundColor: dellColors[index % dellColors.length] }}
+                          />
+                          <div className="flex-1">
+                            <div className="flex justify-between text-sm">
+                              <span>{entry.name}</span>
+                              <span>{entry.votes} votes ({percentage}%)</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                              <div 
+                                className="h-2 rounded-full"
+                                style={{ 
+                                  width: `${percentage}%`,
+                                  backgroundColor: dellColors[index % dellColors.length]
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 ) : (
                   <p className="text-gray-500">No votes yet.</p>
                 )}
