@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api from '../api';
 
 const TABS = ['schedule', 'restaurant', 'groups', 'registrations', 'voting-groups', 'voting-results'];
@@ -62,6 +62,7 @@ export default function AdminDashboardPage() {
   const [newSessionDescription, setNewSessionDescription] = useState('');
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({ saving: false, message: '', error: '' });
+  const votingResultsAutoRefreshRef = useRef(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -113,6 +114,52 @@ export default function AdminDashboardPage() {
     }
   }, [tab, selectedSessionId]);
 
+  // Auto-refresh voting results only when timer is active (within timer duration)
+  useEffect(() => {
+    // Clear any existing interval
+    if (votingResultsAutoRefreshRef.current) {
+      clearInterval(votingResultsAutoRefreshRef.current);
+      votingResultsAutoRefreshRef.current = null;
+    }
+
+    // Only auto-refresh if on voting-results tab, session is selected, and timer is active
+    if (tab !== 'voting-results' || !selectedSessionId) return;
+
+    const session = votingSessions.find((s) => s.id === selectedSessionId);
+    
+    // Check if timer is active (has timerEnd and not paused)
+    if (!session?.timerEnd || session?.remainingMinutes) return;
+
+    // Check if timer has expired
+    const now = new Date();
+    const end = new Date(session.timerEnd);
+    if (now >= end) return;
+
+    // Timer is active - set up auto-refresh every 5 seconds
+    const loadResults = async () => {
+      try {
+        const { data } = await api.get(`/api/admin/voting-sessions/${selectedSessionId}/results`);
+        setVotingResults(data);
+        // Also refresh sessions to update total votes
+        const { data: sessions } = await api.get('/api/admin/voting-sessions');
+        setVotingSessions(sessions);
+      } catch (err) {
+        console.error('Failed to load voting results:', err);
+      }
+    };
+
+    loadResults();
+    votingResultsAutoRefreshRef.current = setInterval(loadResults, 5000);
+
+    // Cleanup function
+    return () => {
+      if (votingResultsAutoRefreshRef.current) {
+        clearInterval(votingResultsAutoRefreshRef.current);
+        votingResultsAutoRefreshRef.current = null;
+      }
+    };
+  }, [tab, selectedSessionId, votingSessions]);
+
   useEffect(() => {
     const session = votingSessions.find((s) => s.id === selectedSessionId);
     
@@ -137,6 +184,11 @@ export default function AdminDashboardPage() {
       const diff = end - now;
       if (diff <= 0) {
         setCountdown('00:00:00');
+        // Clear auto-refresh interval when timer expires
+        if (votingResultsAutoRefreshRef.current) {
+          clearInterval(votingResultsAutoRefreshRef.current);
+          votingResultsAutoRefreshRef.current = null;
+        }
         api.get('/api/admin/voting-sessions').then(({ data: sessions }) => {
           setVotingSessions(sessions);
         }).catch(err => console.error('Failed to refresh sessions:', err));
@@ -406,6 +458,12 @@ export default function AdminDashboardPage() {
   const pauseTimer = async () => {
     if (!selectedSessionId) return;
     
+    // Clear auto-refresh interval when pausing
+    if (votingResultsAutoRefreshRef.current) {
+      clearInterval(votingResultsAutoRefreshRef.current);
+      votingResultsAutoRefreshRef.current = null;
+    }
+    
     setStatus({ saving: true, message: '', error: '' });
     try {
       const session = votingSessions.find((s) => s.id === selectedSessionId);
@@ -465,6 +523,13 @@ export default function AdminDashboardPage() {
       return;
     }
     if (!window.confirm('Are you sure you want to reset all votes for this session?')) return;
+    
+    // Clear auto-refresh interval when resetting votes
+    if (votingResultsAutoRefreshRef.current) {
+      clearInterval(votingResultsAutoRefreshRef.current);
+      votingResultsAutoRefreshRef.current = null;
+    }
+    
     setStatus({ saving: true, message: '', error: '' });
     try {
       await api.post(`/api/admin/voting-sessions/${selectedSessionId}/reset`);
@@ -480,6 +545,12 @@ export default function AdminDashboardPage() {
 
   const resetTimer = async () => {
     if (!selectedSessionId) return;
+    
+    // Clear auto-refresh interval when resetting timer
+    if (votingResultsAutoRefreshRef.current) {
+      clearInterval(votingResultsAutoRefreshRef.current);
+      votingResultsAutoRefreshRef.current = null;
+    }
     
     setStatus({ saving: true, message: '', error: '' });
     try {
