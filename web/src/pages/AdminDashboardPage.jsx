@@ -386,6 +386,14 @@ export default function AdminDashboardPage() {
     
     setStatus({ saving: true, message: '', error: '' });
     try {
+      // Enable the session when starting the timer so users can see it
+      await updateVotingSession(selectedSessionId, { enabled: true });
+      // Disable all other sessions
+      votingSessions.forEach(s => {
+        if (s.id !== selectedSessionId) {
+          updateVotingSession(s.id, { enabled: false });
+        }
+      });
       const { data } = await api.post(`/api/admin/voting-sessions/${selectedSessionId}/timer`, { durationMinutes: duration });
       const { data: sessions } = await api.get('/api/admin/voting-sessions');
       setVotingSessions(sessions);
@@ -433,6 +441,14 @@ export default function AdminDashboardPage() {
     
     setStatus({ saving: true, message: '', error: '' });
     try {
+      // Enable the session when continuing the timer so users can see it
+      await updateVotingSession(selectedSessionId, { enabled: true });
+      // Disable all other sessions
+      votingSessions.forEach(s => {
+        if (s.id !== selectedSessionId) {
+          updateVotingSession(s.id, { enabled: false });
+        }
+      });
       const { data } = await api.post(`/api/admin/voting-sessions/${selectedSessionId}/timer`, { durationMinutes: duration });
       const { data: sessions } = await api.get('/api/admin/voting-sessions');
       setVotingSessions(sessions);
@@ -871,7 +887,16 @@ export default function AdminDashboardPage() {
                 <h3 className="font-bold text-lg">Session Groups</h3>
                 <select
                   value={selectedSessionId}
-                  onChange={(e) => setSelectedSessionId(e.target.value)}
+                  onChange={(e) => {
+                    const newSessionId = e.target.value;
+                    setSelectedSessionId(newSessionId);
+                    // Enable the selected session and disable others
+                    if (newSessionId) {
+                      votingSessions.forEach(session => {
+                        updateVotingSession(session.id, { enabled: session.id === newSessionId });
+                      });
+                    }
+                  }}
                   className="border rounded px-2 py-1"
                 >
                   {votingSessions.map((s) => (
