@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import api from '../api';
 
 const TABS = ['schedule', 'restaurant', 'groups', 'registrations', 'voting-groups', 'voting-results'];
@@ -11,6 +11,18 @@ const TAB_LABELS = {
   'voting-groups': 'Voting Groups',
   'voting-results': 'Voting Results'
 };
+const GROUP_DSPS = [
+  '1000Fix',
+  'Inbox',
+  'Softlogic',
+  'CTC',
+  'Digipro',
+  'NCR',
+  'SOG',
+  'Getronics',
+  'SVOA',
+  'ISS'
+].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 
 function TabButton({ active, onClick, label }) {
   return (
@@ -38,15 +50,21 @@ export default function AdminDashboardPage() {
     qrName: ''
   });
   const [qrUploadFile, setQrUploadFile] = useState(null);
+  const [groups, setGroups] = useState([]);
+  const [selectedGroupIds, setSelectedGroupIds] = useState(new Set());
+  const [registrations, setRegistrations] = useState([]);
+  const [selectedRegistrationIds, setSelectedRegistrationIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({ saving: false, message: '', error: '' });
 
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [s, r] = await Promise.all([
+        const [s, r, g, reg] = await Promise.all([
           api.get('/api/admin/schedule'),
-          api.get('/api/admin/restaurant')
+          api.get('/api/admin/restaurant'),
+          api.get('/api/admin/groups'),
+          api.get('/api/admin/registrations')
         ]);
         setSchedule(s.data);
         setRestaurant({
@@ -57,6 +75,8 @@ export default function AdminDashboardPage() {
           qrName: '',
           ...r.data
         });
+        setGroups(g.data);
+        setRegistrations(reg.data);
       } catch (err) {
         console.error('Failed to load data:', err);
         setStatus({ saving: false, message: '', error: 'Failed to load data' });
@@ -102,6 +122,127 @@ export default function AdminDashboardPage() {
       setStatus({ saving: false, message: '', error: 'Save failed.' });
     }
   };
+
+  const saveGroups = async () => {
+    setStatus({ saving: true, message: '', error: '' });
+    try {
+      await api.put('/api/admin/groups', groups);
+      const { data } = await api.get('/api/admin/registrations');
+      setRegistrations(data);
+      setSelectedGroupIds(new Set());
+      setStatus({ saving: false, message: 'Saved successfully.', error: '' });
+    } catch {
+      setStatus({ saving: false, message: '', error: 'Save failed.' });
+    }
+  };
+
+  const addGroup = () => {
+    const used = new Set(groups.map((g) => g.dsp));
+    const nextDsp = GROUP_DSPS.find((d) => !used.has(d));
+    if (!nextDsp) return;
+    setGroups([...groups, { id: `${Date.now()}`, dsp: nextDsp, group: '', table: '' }]);
+  };
+
+  const updateGroup = (id, field, value) => {
+    setGroups(groups.map((g) => (g.id === id ? { ...g, [field]: value } : g)));
+  };
+
+  const availableDsps = (id) => {
+    const used = new Set(groups.filter((g) => g.id !== id).map((g) => g.dsp));
+    return GROUP_DSPS.filter((d) => !used.has(d));
+  };
+
+  const toggleGroup = (id) => {
+    const next = new Set(selectedGroupIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedGroupIds(next);
+  };
+
+  const toggleAllGroups = () => {
+    if (selectedGroupIds.size === groups.length) {
+      setSelectedGroupIds(new Set());
+    } else {
+      setSelectedGroupIds(new Set(groups.map((g) => g.id)));
+    }
+  };
+
+  const removeSelectedGroups = async () => {
+    if (selectedGroupIds.size === 0) return;
+    const count = selectedGroupIds.size;
+    if (!window.confirm(`Are you sure you want to remove ${count} group mapping(s)?`)) return;
+    setStatus({ saving: true, message: '', error: '' });
+    try {
+      const ids = Array.from(selectedGroupIds);
+      await api.delete('/api/admin/groups', { data: { ids } });
+      const { data } = await api.get('/api/admin/groups');
+      setGroups(data);
+      const { data: regData } = await api.get('/api/admin/registrations');
+      setRegistrations(regData);
+      setSelectedGroupIds(new Set());
+      setStatus({ saving: false, message: 'Removed successfully.', error: '' });
+    } catch {
+      setStatus({ saving: false, message: '', error: 'Remove failed.' });
+    }
+  };
+
+  const toggleRegistration = (id) => {
+    const next = new Set(selectedRegistrationIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedRegistrationIds(next);
+  };
+
+  const toggleAllRegistrations = () => {
+    if (selectedRegistrationIds.size === registrations.length) {
+      setSelectedRegistrationIds(new Set());
+    } else {
+      setSelectedRegistrationIds(new Set(registrations.map((r) => r.id)));
+    }
+  };
+
+  const removeSelectedRegistrations = async () => {
+    if (selectedRegistrationIds.size === 0) return;
+    const count = selectedRegistrationIds.size;
+    if (!window.confirm(`Are you sure you want to remove ${count} registration(s)?`)) return;
+    setStatus({ saving: true, message: '', error: '' });
+    try {
+      const ids = Array.from(selectedRegistrationIds);
+      await api.delete('/api/admin/registrations', { data: { ids } });
+      const { data } = await api.get('/api/admin/registrations');
+      setRegistrations(data);
+      setSelectedRegistrationIds(new Set());
+      setStatus({ saving: false, message: 'Removed successfully.', error: '' });
+    } catch {
+      setStatus({ saving: false, message: '', error: 'Remove failed.' });
+    }
+  };
+
+  const downloadRegistrations = async () => {
+    try {
+      const response = await api.get('/api/admin/registrations/export', { responseType: 'blob' });
+      const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'registrations.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      setStatus({ saving: false, message: '', error: 'Download failed.' });
+    }
+  };
+
+  const loadRegistrations = useCallback(async () => {
+    try {
+      const { data } = await api.get('/api/admin/registrations');
+      setRegistrations(data);
+    } catch (err) {
+      console.error('Failed to load registrations:', err);
+    }
+  }, []);
 
   if (loading) return <div className="text-center p-8">Loading...</div>;
 
@@ -241,16 +382,164 @@ export default function AdminDashboardPage() {
       )}
 
       {tab === 'groups' && (
-        <div className="bg-white rounded-xl p-4 shadow">
-          <h3 className="font-bold text-lg mb-2">Groups</h3>
-          <p className="text-gray-600">Group management will be added here.</p>
+        <div>
+          <p className="text-sm text-gray-600 mb-2">
+            Assign a group to each DSP. Registrations will show the group that matches their DSP.
+          </p>
+          <div className="flex gap-2 mb-3">
+            <button
+              onClick={addGroup}
+              disabled={status.saving || !GROUP_DSPS.some((d) => !groups.some((g) => g.dsp === d))}
+              className="bg-brand text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
+            >
+              Add DSP
+            </button>
+            <button
+              onClick={removeSelectedGroups}
+              disabled={status.saving || selectedGroupIds.size === 0}
+              className="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
+            >
+              Remove Selected
+            </button>
+          </div>
+          <div className="bg-white rounded-xl shadow overflow-hidden mb-4">
+            {groups.length === 0 ? (
+              <p className="p-4 text-gray-500">No group mappings yet.</p>
+            ) : (
+              <table className="w-full text-sm text-left">
+                <thead className="bg-gray-100 text-gray-700">
+                  <tr>
+                    <th className="p-3 w-10">
+                      <input
+                        type="checkbox"
+                        checked={groups.length > 0 && selectedGroupIds.size === groups.length}
+                        onChange={toggleAllGroups}
+                      />
+                    </th>
+                    <th className="p-3">DSP</th>
+                    <th className="p-3">Group</th>
+                    <th className="p-3">Table</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {groups.map((g) => (
+                    <tr key={g.id} className="border-t">
+                      <td className="p-3 w-10">
+                        <input
+                          type="checkbox"
+                          checked={selectedGroupIds.has(g.id)}
+                          onChange={() => toggleGroup(g.id)}
+                        />
+                      </td>
+                      <td className="p-3">
+                        <select
+                          value={g.dsp}
+                          onChange={(e) => updateGroup(g.id, 'dsp', e.target.value)}
+                          className="w-full border rounded px-2 py-1 bg-white"
+                        >
+                          {(() => {
+                            const options = availableDsps(g.id);
+                            if (g.dsp && !options.includes(g.dsp)) options.unshift(g.dsp);
+                            return options.map((d) => (
+                              <option key={d} value={d}>{d}</option>
+                            ));
+                          })()}
+                        </select>
+                      </td>
+                      <td className="p-3">
+                        <input
+                          value={g.group}
+                          onChange={(e) => updateGroup(g.id, 'group', e.target.value)}
+                          className="w-full border rounded px-2 py-1"
+                          placeholder="Group"
+                        />
+                      </td>
+                      <td className="p-3">
+                        <input
+                          value={g.table || ''}
+                          onChange={(e) => updateGroup(g.id, 'table', e.target.value)}
+                          className="w-full border rounded px-2 py-1"
+                          placeholder="Table"
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+          <button
+            onClick={saveGroups}
+            disabled={status.saving}
+            className="w-full bg-brand text-white py-2 rounded-lg font-semibold disabled:opacity-50"
+          >
+            {status.saving ? 'Saving...' : 'Save Groups'}
+          </button>
         </div>
       )}
 
       {tab === 'registrations' && (
-        <div className="bg-white rounded-xl p-4 shadow">
-          <h3 className="font-bold text-lg mb-2">Registrations</h3>
-          <p className="text-gray-600">Registration management will be added here.</p>
+        <div>
+          <div className="flex justify-end gap-2 mb-3">
+            <button
+              onClick={removeSelectedRegistrations}
+              disabled={status.saving || selectedRegistrationIds.size === 0}
+              className="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
+            >
+              Remove Selected
+            </button>
+            <button
+              onClick={downloadRegistrations}
+              disabled={status.saving || registrations.length === 0}
+              className="bg-brand text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
+            >
+              Download Excel
+            </button>
+          </div>
+          <div className="bg-white rounded-xl shadow overflow-hidden">
+            {registrations.length === 0 ? (
+              <p className="p-4 text-gray-500">No registrations yet.</p>
+            ) : (
+              <table className="w-full text-sm text-left">
+                <thead className="bg-gray-100 text-gray-700">
+                  <tr>
+                    <th className="p-3 w-10">
+                      <input
+                        type="checkbox"
+                        checked={registrations.length > 0 && selectedRegistrationIds.size === registrations.length}
+                        onChange={toggleAllRegistrations}
+                      />
+                    </th>
+                    <th className="p-3">Full Name</th>
+                    <th className="p-3">Email</th>
+                    <th className="p-3">DSP</th>
+                    <th className="p-3">Group</th>
+                    <th className="p-3">Table</th>
+                    <th className="p-3">Submitted At</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {registrations.map((r, i) => (
+                    <tr key={i} className="border-t">
+                      <td className="p-3 w-10">
+                        <input
+                          type="checkbox"
+                          checked={selectedRegistrationIds.has(r.id)}
+                          onChange={() => toggleRegistration(r.id)}
+                        />
+                      </td>
+                      <td className="p-3">{r.fullName}</td>
+                      <td className="p-3">{r.email}</td>
+                      <td className="p-3">{r.dsp}</td>
+                      <td className="p-3">{r.group || '-'}</td>
+                      <td className="p-3">{r.table || '-'}</td>
+                      <td className="p-3">{new Date(r.createdAt).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
       )}
 
