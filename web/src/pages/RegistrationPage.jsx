@@ -56,10 +56,11 @@ export default function RegistrationPage() {
         )
       });
       setForm({ fullName: '', email: '', dsp: '' });
-    } catch {
+    } catch (err) {
+      const errorMessage = err.response?.data?.message || 'Could not submit. Please try again.';
       setStatus({
         loading: false,
-        error: 'Could not submit. Please try again.',
+        error: errorMessage,
         success: ''
       });
     }

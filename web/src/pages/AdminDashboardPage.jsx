@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import api from '../api';
 import EditableList from '../components/EditableList';
 import Loading from '../components/Loading';
@@ -116,6 +116,20 @@ export default function AdminDashboardPage() {
       autoRefreshIntervalRef.current = null;
     }
     
+    if (tab === 'registrations') {
+      // Auto-refresh registrations every 5 seconds
+      loadRegistrations();
+      autoRefreshIntervalRef.current = setInterval(() => {
+        loadRegistrations();
+      }, 5000);
+      return () => {
+        if (autoRefreshIntervalRef.current) {
+          clearInterval(autoRefreshIntervalRef.current);
+          autoRefreshIntervalRef.current = null;
+        }
+      };
+    }
+    
     if (tab !== 'voting-results' || !selectedSessionId) return;
     const session = votingSessions.find((s) => s.id === selectedSessionId);
     
@@ -176,7 +190,7 @@ export default function AdminDashboardPage() {
         autoRefreshIntervalRef.current = null;
       }
     };
-  }, [tab, selectedSessionId, votingSessions]);
+  }, [tab, selectedSessionId, votingSessions, loadRegistrations]);
 
   useEffect(() => {
     // Load voting results when session is selected in voting results tab
@@ -241,6 +255,15 @@ export default function AdminDashboardPage() {
   const setMessage = (message, error = '') => {
     setStatus({ saving: false, message, error });
   };
+
+  const loadRegistrations = useCallback(async () => {
+    try {
+      const { data } = await api.get('/api/admin/registrations');
+      setRegistrations(data);
+    } catch (err) {
+      console.error('Failed to load registrations:', err);
+    }
+  }, []);
 
   const uploadSchedule = async () => {
     if (!uploadFile) return;
@@ -316,8 +339,7 @@ export default function AdminDashboardPage() {
     setStatus({ saving: true, message: '', error: '' });
     try {
       await api.put('/api/admin/groups', groups);
-      const { data } = await api.get('/api/admin/registrations');
-      setRegistrations(data);
+      await loadRegistrations();
       setSelectedGroupIds(new Set());
       setStatus({ saving: false, message: 'Saved successfully.', error: '' });
     } catch {
@@ -366,8 +388,7 @@ export default function AdminDashboardPage() {
       await api.delete('/api/admin/groups', { data: { ids } });
       const { data } = await api.get('/api/admin/groups');
       setGroups(data);
-      const { data: regData } = await api.get('/api/admin/registrations');
-      setRegistrations(regData);
+      await loadRegistrations();
       setSelectedGroupIds(new Set());
       setStatus({ saving: false, message: 'Removed successfully.', error: '' });
     } catch {
@@ -398,8 +419,7 @@ export default function AdminDashboardPage() {
     try {
       const ids = Array.from(selectedRegistrationIds);
       await api.delete('/api/admin/registrations', { data: { ids } });
-      const { data } = await api.get('/api/admin/registrations');
-      setRegistrations(data);
+      await loadRegistrations();
       setSelectedRegistrationIds(new Set());
       setStatus({ saving: false, message: 'Removed successfully.', error: '' });
     } catch {
