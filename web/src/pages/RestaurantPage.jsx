@@ -17,7 +17,7 @@ export default function RestaurantPage() {
 
   const downloadQR = async () => {
     try {
-      const response = await api.get('/api/restaurant/qr', { responseType: 'blob' });
+      const response = await api.get('/api/restaurant/qr?display=false', { responseType: 'blob' });
       const blob = new Blob([response.data], { type: response.data.type || 'application/octet-stream' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -48,6 +48,17 @@ export default function RestaurantPage() {
           <span className="font-semibold">Timing:</span> {data.timing}
         </p>
       </div>
+      {data.qrFile && (
+        <div className="mt-6 flex justify-center">
+          <div className="border-2 border-gray-300 rounded-lg p-2 bg-white">
+            <img
+              src={`/api/restaurant/qr?display=true`}
+              alt="Restaurant QR Code"
+              className="w-[4cm] h-[4cm] object-contain"
+            />
+          </div>
+        </div>
+      )}
       <button
         onClick={downloadQR}
         disabled={!data.qrFile}

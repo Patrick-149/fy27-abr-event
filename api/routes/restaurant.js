@@ -41,7 +41,9 @@ router.get('/qr', async (req, res, next) => {
         : ext === 'jpg' || ext === 'jpeg'
         ? 'image/jpeg'
         : 'application/octet-stream';
-    res.setHeader('Content-Disposition', `attachment; filename="${data.qrName || 'qrcode'}"`);
+    // Use inline for display, attachment for download
+    const isDisplay = req.query.display === 'true';
+    res.setHeader('Content-Disposition', `${isDisplay ? 'inline' : 'attachment'}; filename="${data.qrName || 'qrcode'}"`);
     res.setHeader('Content-Type', contentType);
     res.send(file);
   } catch (err) {
