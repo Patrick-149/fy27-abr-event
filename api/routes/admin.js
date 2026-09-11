@@ -6,7 +6,7 @@ import xlsx from 'xlsx';
 import { ObjectId } from 'mongodb';
 import { authenticate, requireAdmin } from '../auth.js';
 import { readJson, writeJson } from '../utils.js';
-import { getRegistrationsCollection, getGroupsCollection, getVotingSessionsCollection, getVotesCollection } from '../db.js';
+import { getRegistrationsCollection, getGroupsCollection, getVotingSessionsCollection, getVotesCollection, getRestaurantCollection } from '../db.js';
 
 const router = Router();
 
@@ -80,15 +80,70 @@ router.post('/schedule/upload', authenticate, requireAdmin, upload.single('sched
   }
 });
 
-router.get('/restaurant', authenticate, requireAdmin, getData('restaurant.json'));
-router.put('/restaurant', authenticate, requireAdmin, putData('restaurant.json'));
+router.get('/restaurant', authenticate, requireAdmin, async (req, res, next) => {
+  try {
+    const collection = getRestaurantCollection();
+    const data = await collection.findOne({});
+    if (!data) {
+      return res.json({ name: '', location: '', timing: '', qrFile: '', qrName: '' });
+    }
+    res.json({
+      name: data.name || '',
+      location: data.location || '',
+      timing: data.timing || '',
+      qrFile: data.qrFile || '',
+      qrName: data.qrName || ''
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put('/restaurant', authenticate, requireAdmin, async (req, res, next) => {
+  try {
+    const collection = getRestaurantCollection();
+    const { name, location, timing, qrFile, qrName } = req.body || {};
+    const updateData = {
+      name: name || '',
+      location: location || '',
+      timing: timing || '',
+      qrFile: qrFile || '',
+      qrName: qrName || ''
+    };
+    await collection.updateOne(
+      {},
+      { $set: updateData },
+      { upsert: true }
+    );
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
 
 router.post('/restaurant/qr', authenticate, requireAdmin, qrUpload.single('qr'), async (req, res, next) => {
   try {
-    const restaurant = await readJson('restaurant.json');
-    restaurant.qrFile = req.file.filename;
-    restaurant.qrName = req.file.originalname;
-    await writeJson('restaurant.json', restaurant);
+    const collection = getRestaurantCollection();
+    const existing = await collection.findOne({});
+    const updateData = {
+      qrFile: req.file.filename,
+      qrName: req.file.originalname
+    };
+    
+    if (existing) {
+      await collection.updateOne(
+        { _id: existing._id },
+        { $set: updateData }
+      );
+    } else {
+      await collection.insertOne({
+        name: '',
+        location: '',
+        timing: '',
+        ...updateData
+      });
+    }
+    
     res.json({ success: true, qrFile: req.file.filename, qrName: req.file.originalname });
   } catch (err) {
     next(err);

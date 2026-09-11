@@ -1,14 +1,25 @@
 import { Router } from 'express';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
-import { readJson } from '../utils.js';
+import { getRestaurantCollection } from '../db.js';
 
 const router = Router();
 
 router.get('/', async (req, res, next) => {
   try {
-    const data = await readJson('restaurant.json');
-    res.json(data);
+    const collection = getRestaurantCollection();
+    const data = await collection.findOne({});
+    if (!data) {
+      // Return default structure if no data exists
+      return res.json({ name: '', location: '', timing: '', qrFile: '', qrName: '' });
+    }
+    res.json({
+      name: data.name || '',
+      location: data.location || '',
+      timing: data.timing || '',
+      qrFile: data.qrFile || '',
+      qrName: data.qrName || ''
+    });
   } catch (err) {
     next(err);
   }
@@ -16,8 +27,9 @@ router.get('/', async (req, res, next) => {
 
 router.get('/qr', async (req, res, next) => {
   try {
-    const data = await readJson('restaurant.json');
-    if (!data.qrFile) {
+    const collection = getRestaurantCollection();
+    const data = await collection.findOne({});
+    if (!data || !data.qrFile) {
       return res.status(404).json({ message: 'No QR code uploaded' });
     }
     const filePath = join(process.cwd(), 'uploads', 'qrcodes', data.qrFile);
