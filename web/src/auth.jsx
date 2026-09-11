@@ -24,10 +24,13 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async (username, password, admin = false) => {
     const endpoint = admin ? '/api/auth/admin-login' : '/api/auth/login';
+    console.log('Attempting login to:', endpoint);
     const { data } = await api.post(endpoint, { username, password });
+    console.log('Login successful:', data);
     sessionStorage.setItem('token', data.token);
     sessionStorage.setItem('user', JSON.stringify(data.user));
     setAuth({ token: data.token, user: data.user, loading: false });
+    console.log('Auth state updated:', { token: data.token, user: data.user });
     return data.user;
   }, []);
 

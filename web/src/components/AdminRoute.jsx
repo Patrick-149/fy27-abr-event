@@ -5,9 +5,18 @@ export default function AdminRoute() {
   const { isAuthenticated, isAdmin } = useAuth();
   const location = useLocation();
 
-  return isAuthenticated && isAdmin ? (
-    <Outlet />
-  ) : (
-    <Navigate to="/admin-login" state={{ from: location }} replace />
-  );
+  console.log('AdminRoute check:', { isAuthenticated, isAdmin, path: location.pathname });
+
+  if (!isAuthenticated) {
+    console.log('Not authenticated, redirecting to login');
+    return <Navigate to="/admin-login" state={{ from: location }} replace />;
+  }
+
+  if (!isAdmin) {
+    console.log('Not admin, redirecting to login');
+    return <Navigate to="/admin-login" state={{ from: location, error: 'Not authorized' }} replace />;
+  }
+
+  console.log('Admin authenticated, rendering outlet');
+  return <Outlet />;
 }

@@ -72,6 +72,7 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     const load = async () => {
+      console.log('Starting admin data load...');
       try {
         const [s, r, rr, g, reg] = await Promise.all([
           api.get('/api/admin/schedule'),
@@ -80,6 +81,7 @@ export default function AdminDashboardPage() {
           api.get('/api/admin/groups'),
           api.get('/api/admin/registrations')
         ]);
+        console.log('Basic data loaded successfully');
         setSchedule(s.data);
         setRestaurant({
           name: '',
@@ -94,6 +96,7 @@ export default function AdminDashboardPage() {
         setRegistrations(reg.data);
         
         const vs = await api.get('/api/admin/voting-sessions');
+        console.log('Voting sessions loaded:', vs.data);
         setVotingSessions(vs.data);
         if (vs.data.length > 0) {
           setSelectedSessionId(vs.data[0].id);
@@ -101,6 +104,7 @@ export default function AdminDashboardPage() {
       } catch (err) {
         console.error('Admin data load error:', err);
         const errorMessage = err.response?.data?.message || err.message || 'Failed to load admin data';
+        console.error('Error message:', errorMessage);
         setStatus({ saving: false, message: '', error: errorMessage });
       } finally {
         setLoading(false);
