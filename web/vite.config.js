@@ -18,7 +18,7 @@ export default defineConfig({
         display: 'standalone',
         scope: '/',
         start_url: '/',
-        version: '2.4.0',
+        version: '3.0.0',
         icons: [
           {
             src: '/icons/icon-192x192.png',
@@ -56,7 +56,9 @@ export default defineConfig({
         ],
         clientsClaim: true,
         skipWaiting: true,
-        cleanupOutdatedCaches: true
+        cleanupOutdatedCaches: true,
+        // Force cache busting
+        cacheId: 'fy27-abr-v3'
       },
       devOptions: {
         enabled: false
@@ -73,6 +75,12 @@ export default defineConfig({
     }
   },
   build: {
-    outDir: 'dist'
+    outDir: 'dist',
+    // Force rebuild by changing cache busting
+    rollupOptions: {
+      output: {
+        manualChunks: undefined
+      }
+    }
   }
 });
