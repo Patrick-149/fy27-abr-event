@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../api';
 
 const TABS = ['schedule', 'restaurant', 'groups', 'registrations', 'voting-groups', 'voting-results'];
@@ -54,6 +54,14 @@ export default function AdminDashboardPage() {
   const [selectedGroupIds, setSelectedGroupIds] = useState(new Set());
   const [registrations, setRegistrations] = useState([]);
   const [selectedRegistrationIds, setSelectedRegistrationIds] = useState(new Set());
+  const [votingSessions, setVotingSessions] = useState([]);
+  const [selectedSessionId, setSelectedSessionId] = useState(null);
+  const [votingResults, setVotingResults] = useState({ results: [], timerEnd: null, totalVotes: 0 });
+  const [timerDuration, setTimerDuration] = useState('');
+  const [countdown, setCountdown] = useState(null);
+  const [newSessionDescription, setNewSessionDescription] = useState('');
+  const [timerExpired, setTimerExpired] = useState(false);
+  const autoRefreshIntervalRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({ saving: false, message: '', error: '' });
 
@@ -77,6 +85,12 @@ export default function AdminDashboardPage() {
         });
         setGroups(g.data);
         setRegistrations(reg.data);
+        
+        const vs = await api.get('/api/admin/voting-sessions');
+        setVotingSessions(vs.data);
+        if (vs.data.length > 0) {
+          setSelectedSessionId(vs.data[0].id);
+        }
       } catch (err) {
         console.error('Failed to load data:', err);
         setStatus({ saving: false, message: '', error: 'Failed to load data' });
@@ -86,6 +100,132 @@ export default function AdminDashboardPage() {
     };
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (autoRefreshIntervalRef.current) {
+      clearInterval(autoRefreshIntervalRef.current);
+      autoRefreshIntervalRef.current = null;
+    }
+    
+    if (tab === 'registrations') {
+      loadRegistrations();
+      autoRefreshIntervalRef.current = setInterval(() => {
+        loadRegistrations();
+      }, 5000);
+      return () => {
+        if (autoRefreshIntervalRef.current) {
+          clearInterval(autoRefreshIntervalRef.current);
+          autoRefreshIntervalRef.current = null;
+        }
+      };
+    }
+    
+    if (tab !== 'voting-results' || !selectedSessionId) return;
+    const session = votingSessions.find((s) => s.id === selectedSessionId);
+    
+    if (!session?.timerEnd || session?.remainingMinutes) return;
+    
+    const now = new Date();
+    const end = new Date(session.timerEnd);
+    if (now >= end) {
+      setTimerExpired(true);
+      return;
+    } else {
+      setTimerExpired(false);
+    }
+    
+    loadVotingResults();
+    autoRefreshIntervalRef.current = setInterval(() => {
+      const currentSession = votingSessions.find((s) => s.id === selectedSessionId);
+      if (currentSession?.remainingMinutes) {
+        clearInterval(autoRefreshIntervalRef.current);
+        autoRefreshIntervalRef.current = null;
+        return;
+      }
+      if (!currentSession?.timerEnd && !currentSession?.remainingMinutes) {
+        clearInterval(autoRefreshIntervalRef.current);
+        autoRefreshIntervalRef.current = null;
+        setTimerExpired(false);
+        return;
+      }
+      const now = new Date();
+      const end = new Date(currentSession.timerEnd);
+      if (now >= end) {
+        clearInterval(autoRefreshIntervalRef.current);
+        autoRefreshIntervalRef.current = null;
+        setTimerExpired(true);
+        api.get('/api/admin/voting-sessions').then(({ data: sessions }) => {
+          setVotingSessions(sessions);
+        }).catch(err => console.error('Failed to refresh sessions:', err));
+        return;
+      }
+      loadVotingResults();
+      api.get('/api/admin/voting-sessions').then(({ data: sessions }) => {
+        setVotingSessions(sessions);
+      }).catch(err => console.error('Failed to refresh sessions:', err));
+    }, 5000);
+    return () => {
+      if (autoRefreshIntervalRef.current) {
+        clearInterval(autoRefreshIntervalRef.current);
+        autoRefreshIntervalRef.current = null;
+      }
+    };
+  }, [tab, selectedSessionId, votingSessions, loadRegistrations]);
+
+  useEffect(() => {
+    if (tab === 'voting-results' && selectedSessionId) {
+      const loadResults = async () => {
+        try {
+          const { data } = await api.get(`/api/admin/voting-sessions/${selectedSessionId}/results`);
+          setVotingResults(data);
+        } catch (err) {
+          console.error('Failed to load voting results:', err);
+        }
+      };
+      loadResults();
+    }
+  }, [tab, selectedSessionId]);
+
+  useEffect(() => {
+    const session = votingSessions.find((s) => s.id === selectedSessionId);
+    
+    if (session?.remainingMinutes) {
+      const hours = Math.floor(session.remainingMinutes / 60);
+      const minutes = session.remainingMinutes % 60;
+      setCountdown(
+        `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00 (Paused)`
+      );
+      setTimerDuration(session.remainingMinutes.toString());
+      return;
+    }
+    
+    if (!session?.timerEnd) {
+      setCountdown(null);
+      return;
+    }
+    
+    const updateCountdown = () => {
+      const now = new Date();
+      const end = new Date(session.timerEnd);
+      const diff = end - now;
+      if (diff <= 0) {
+        setCountdown('00:00:00');
+        api.get('/api/admin/voting-sessions').then(({ data: sessions }) => {
+          setVotingSessions(sessions);
+        }).catch(err => console.error('Failed to refresh sessions:', err));
+        return;
+      }
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+      setCountdown(
+        `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+      );
+    };
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, [selectedSessionId, votingSessions]);
 
   const saveSchedule = async () => {
     setStatus({ saving: true, message: '', error: '' });
@@ -243,6 +383,225 @@ export default function AdminDashboardPage() {
       console.error('Failed to load registrations:', err);
     }
   }, []);
+
+  const createVotingSession = async () => {
+    if (!newSessionDescription) return;
+    setStatus({ saving: true, message: '', error: '' });
+    try {
+      const { data } = await api.post('/api/admin/voting-sessions', { 
+        sessionDescription: newSessionDescription,
+        groups: []
+      });
+      setNewSessionDescription('');
+      const { data: sessions } = await api.get('/api/admin/voting-sessions');
+      setVotingSessions(sessions);
+      setSelectedSessionId(data.id);
+      setStatus({ saving: false, message: 'Session created.', error: '' });
+    } catch {
+      setStatus({ saving: false, message: '', error: 'Failed to create session.' });
+    }
+  };
+
+  const updateVotingSession = async (id, updates) => {
+    setStatus({ saving: true, message: '', error: '' });
+    try {
+      await api.put(`/api/admin/voting-sessions/${id}`, updates);
+      const { data: sessions } = await api.get('/api/admin/voting-sessions');
+      setVotingSessions(sessions);
+      setStatus({ saving: false, message: 'Session updated.', error: '' });
+    } catch {
+      setStatus({ saving: false, message: '', error: 'Failed to update session.' });
+    }
+  };
+
+  const deleteVotingSession = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this session and all its votes?')) return;
+    setStatus({ saving: true, message: '', error: '' });
+    try {
+      await api.delete(`/api/admin/voting-sessions/${id}`);
+      const { data: sessions } = await api.get('/api/admin/voting-sessions');
+      setVotingSessions(sessions);
+      if (selectedSessionId === id) {
+        setSelectedSessionId(sessions.length > 0 ? sessions[0].id : null);
+      }
+      setStatus({ saving: false, message: 'Session deleted.', error: '' });
+    } catch {
+      setStatus({ saving: false, message: '', error: 'Failed to delete session.' });
+    }
+  };
+
+  const addSessionGroup = (sessionId) => {
+    const session = votingSessions.find((s) => s.id === sessionId);
+    if (!session) return;
+    const updatedGroups = [...(session.groups || []), { id: `${Date.now()}`, name: '', description: '' }];
+    updateVotingSession(sessionId, { groups: updatedGroups });
+  };
+
+  const updateSessionGroup = (sessionId, groupId, field, value) => {
+    const session = votingSessions.find((s) => s.id === sessionId);
+    if (!session) return;
+    const updatedGroups = session.groups.map((g) => (g.id === groupId ? { ...g, [field]: value } : g));
+    updateVotingSession(sessionId, { groups: updatedGroups });
+  };
+
+  const removeSessionGroup = (sessionId, groupId) => {
+    const session = votingSessions.find((s) => s.id === sessionId);
+    if (!session) return;
+    const updatedGroups = session.groups.filter((g) => g.id !== groupId);
+    updateVotingSession(sessionId, { groups: updatedGroups });
+  };
+
+  const startTimer = async () => {
+    if (!selectedSessionId) return;
+    const session = votingSessions.find((s) => s.id === selectedSessionId);
+    const duration = Number(timerDuration);
+    if (!duration || duration <= 0) return;
+    
+    if (autoRefreshIntervalRef.current) {
+      clearInterval(autoRefreshIntervalRef.current);
+      autoRefreshIntervalRef.current = null;
+    }
+    
+    setStatus({ saving: true, message: '', error: '' });
+    try {
+      const { data } = await api.post(`/api/admin/voting-sessions/${selectedSessionId}/timer`, { durationMinutes: duration });
+      const { data: sessions } = await api.get('/api/admin/voting-sessions');
+      setVotingSessions(sessions);
+      setStatus({ saving: false, message: 'Timer started.', error: '' });
+    } catch {
+      setStatus({ saving: false, message: '', error: 'Failed to start timer.' });
+    }
+  };
+
+  const pauseTimer = async () => {
+    if (!selectedSessionId) return;
+    
+    if (autoRefreshIntervalRef.current) {
+      clearInterval(autoRefreshIntervalRef.current);
+      autoRefreshIntervalRef.current = null;
+    }
+    
+    setStatus({ saving: true, message: '', error: '' });
+    try {
+      const session = votingSessions.find((s) => s.id === selectedSessionId);
+      if (!session?.timerEnd) {
+        setStatus({ saving: false, message: '', error: 'No active timer to pause.' });
+        return;
+      }
+      
+      const now = new Date();
+      const end = new Date(session.timerEnd);
+      const remainingMs = end - now;
+      const remainingMinutes = Math.max(0, Math.ceil(remainingMs / (1000 * 60)));
+      
+      await api.post(`/api/admin/voting-sessions/${selectedSessionId}/timer`, { durationMinutes: remainingMinutes, paused: true });
+      const { data: sessions } = await api.get('/api/admin/voting-sessions');
+      setVotingSessions(sessions);
+      setTimerDuration(remainingMinutes.toString());
+      setStatus({ saving: false, message: 'Timer paused.', error: '' });
+    } catch {
+      setStatus({ saving: false, message: '', error: 'Failed to pause timer.' });
+    }
+  };
+
+  const continueTimer = async () => {
+    if (!selectedSessionId) return;
+    const session = votingSessions.find((s) => s.id === selectedSessionId);
+    
+    if (autoRefreshIntervalRef.current) {
+      clearInterval(autoRefreshIntervalRef.current);
+      autoRefreshIntervalRef.current = null;
+    }
+    
+    const duration = session?.remainingMinutes ? session.remainingMinutes : Number(timerDuration);
+    if (!duration || duration <= 0) {
+      setStatus({ saving: false, message: '', error: 'Please enter a valid duration.' });
+      return;
+    }
+    
+    setStatus({ saving: true, message: '', error: '' });
+    try {
+      const { data } = await api.post(`/api/admin/voting-sessions/${selectedSessionId}/timer`, { durationMinutes: duration });
+      const { data: sessions } = await api.get('/api/admin/voting-sessions');
+      setVotingSessions(sessions);
+      setTimerDuration(duration.toString());
+      setStatus({ saving: false, message: 'Timer continued.', error: '' });
+    } catch {
+      setStatus({ saving: false, message: '', error: 'Failed to continue timer.' });
+    }
+  };
+
+  const resetVotes = async () => {
+    if (!selectedSessionId) {
+      setStatus({ saving: false, message: '', error: 'Please select a voting session first.' });
+      return;
+    }
+    if (!window.confirm('Are you sure you want to reset all votes for this session?')) return;
+    setStatus({ saving: true, message: '', error: '' });
+    try {
+      await api.post(`/api/admin/voting-sessions/${selectedSessionId}/reset`);
+      const { data: sessions } = await api.get('/api/admin/voting-sessions');
+      setVotingSessions(sessions);
+      setTimerDuration('');
+      setCountdown(null);
+      setTimerExpired(false);
+      setStatus({ saving: false, message: 'Votes reset.', error: '' });
+    } catch {
+      setStatus({ saving: false, message: '', error: 'Failed to reset votes.' });
+    }
+  };
+
+  const resetTimer = async () => {
+    if (!selectedSessionId) return;
+    
+    if (autoRefreshIntervalRef.current) {
+      clearInterval(autoRefreshIntervalRef.current);
+      autoRefreshIntervalRef.current = null;
+    }
+    
+    setStatus({ saving: true, message: '', error: '' });
+    try {
+      await api.post(`/api/admin/voting-sessions/${selectedSessionId}/reset-timer`);
+      const { data: sessions } = await api.get('/api/admin/voting-sessions');
+      setVotingSessions(sessions);
+      setTimerDuration('');
+      setCountdown(null);
+      setTimerExpired(false);
+      setStatus({ saving: false, message: 'Timer reset.', error: '' });
+    } catch {
+      setStatus({ saving: false, message: '', error: 'Failed to reset timer.' });
+    }
+  };
+
+  const loadVotingResults = async () => {
+    if (!selectedSessionId) return;
+    setStatus({ saving: true, message: '', error: '' });
+    try {
+      const { data } = await api.get(`/api/admin/voting-sessions/${selectedSessionId}/results`);
+      setVotingResults(data);
+      setStatus({ saving: false, message: '', error: '' });
+    } catch {
+      setStatus({ saving: false, message: '', error: 'Failed to load voting results.' });
+    }
+  };
+
+  const downloadVotingResults = async () => {
+    if (!selectedSessionId) return;
+    try {
+      const response = await api.get(`/api/admin/voting-sessions/${selectedSessionId}/export`, { responseType: 'blob' });
+      const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'votes.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      setStatus({ saving: false, message: '', error: 'Download failed.' });
+    }
+  };
 
   if (loading) return <div className="text-center p-8">Loading...</div>;
 
@@ -544,16 +903,316 @@ export default function AdminDashboardPage() {
       )}
 
       {tab === 'voting-groups' && (
-        <div className="bg-white rounded-xl p-4 shadow">
-          <h3 className="font-bold text-lg mb-2">Voting Groups</h3>
-          <p className="text-gray-600">Voting group management will be added here.</p>
+        <div>
+          <p className="text-sm text-gray-600 mb-2">
+            Manage voting sessions. Each session has its own groups and description.
+          </p>
+          <div className="bg-white rounded-xl p-4 shadow space-y-3 mb-4">
+            <h3 className="font-bold text-lg">Create New Session</h3>
+            <div className="flex gap-2">
+              <input
+                value={newSessionDescription}
+                onChange={(e) => setNewSessionDescription(e.target.value)}
+                className="flex-1 border rounded px-2 py-1"
+                placeholder="Session description (required)"
+              />
+              <button
+                onClick={createVotingSession}
+                disabled={status.saving || !newSessionDescription}
+                className="bg-brand text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
+              >
+                Create
+              </button>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl p-4 shadow space-y-3 mb-4">
+            <h3 className="font-bold text-lg">All Sessions</h3>
+            {votingSessions.length === 0 ? (
+              <p className="text-gray-500">No sessions yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {votingSessions.map((s) => (
+                  <div key={s.id} className="border rounded-lg p-3 flex justify-between items-center">
+                    <div>
+                      <p className="font-medium">{s.sessionDescription}</p>
+                      <p className="text-sm text-gray-500">
+                        Created: {new Date(s.createdAt).toLocaleString()}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        Groups: {s.groups?.length || 0}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => deleteVotingSession(s.id)}
+                      className="text-red-600 text-sm hover:underline"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          {selectedSessionId && (
+            <div className="bg-white rounded-xl p-4 shadow space-y-3 mb-4">
+              <div className="flex justify-between items-center">
+                <h3 className="font-bold text-lg">Session Groups</h3>
+                <select
+                  value={selectedSessionId}
+                  onChange={(e) => setSelectedSessionId(e.target.value)}
+                  className="border rounded px-2 py-1"
+                >
+                  {votingSessions.map((s) => (
+                    <option key={s.id} value={s.id}>{s.sessionDescription}</option>
+                  ))}
+                </select>
+              </div>
+              {(() => {
+                const session = votingSessions.find((s) => s.id === selectedSessionId);
+                if (!session) return null;
+                return (
+                  <>
+                    {session.groups.map((g) => (
+                      <div key={g.id} className="border rounded-lg p-3">
+                        <div className="flex gap-2 items-center">
+                          <input
+                            value={g.name}
+                            onChange={(e) => updateSessionGroup(selectedSessionId, g.id, 'name', e.target.value)}
+                            className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-colors"
+                            placeholder="Group name"
+                            autoComplete="off"
+                          />
+                          <button
+                            onClick={() => removeSessionGroup(selectedSessionId, g.id)}
+                            className="text-red-600 text-sm hover:underline whitespace-nowrap"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => addSessionGroup(selectedSessionId)}
+                      className="w-full py-2 border-2 border-dashed border-brand text-brand rounded-lg"
+                    >
+                      + Add Group
+                    </button>
+                  </>
+                );
+              })()}
+            </div>
+          )}
         </div>
       )}
 
       {tab === 'voting-results' && (
-        <div className="bg-white rounded-xl p-4 shadow">
-          <h3 className="font-bold text-lg mb-2">Voting Results</h3>
-          <p className="text-gray-600">Voting results will be displayed here.</p>
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <div className="flex gap-2 items-center">
+              <select
+                value={selectedSessionId || ''}
+                onChange={(e) => {
+                  const newSessionId = e.target.value;
+                  setSelectedSessionId(newSessionId);
+                  if (newSessionId) {
+                    votingSessions.forEach(session => {
+                      updateVotingSession(session.id, { enabled: session.id === newSessionId });
+                    });
+                  }
+                }}
+                className="border rounded px-2 py-1"
+              >
+                <option value="">Select a session</option>
+                {votingSessions.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.sessionDescription}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={resetVotes}
+                disabled={status.saving || !selectedSessionId}
+                className="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
+              >
+                Reset Votes
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={downloadVotingResults}
+                disabled={status.saving || !selectedSessionId}
+                className="bg-brand text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
+              >
+                Download Results
+              </button>
+            </div>
+          </div>
+          {selectedSessionId && (
+            <>
+              <div className="bg-white rounded-xl p-4 shadow space-y-4 mb-4">
+                <h3 className="font-bold text-lg">Timer</h3>
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="number"
+                    value={timerDuration}
+                    onChange={(e) => setTimerDuration(e.target.value)}
+                    className="w-24 border rounded px-2 py-1"
+                    placeholder="Minutes"
+                    min="1"
+                  />
+                  <span className="text-sm text-gray-600">(mins)</span>
+                  <button
+                    onClick={startTimer}
+                    disabled={status.saving || !timerDuration}
+                    className="bg-brand text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
+                  >
+                    Start Timer
+                  </button>
+                  {(() => {
+                    const session = votingSessions.find((s) => s.id === selectedSessionId);
+                    if (session?.timerEnd) {
+                      return (
+                        <button
+                          onClick={pauseTimer}
+                          disabled={status.saving}
+                          className="bg-yellow-500 text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
+                        >
+                          Pause
+                        </button>
+                      );
+                    } else if (session?.remainingMinutes) {
+                      return (
+                        <button
+                          onClick={continueTimer}
+                          disabled={status.saving}
+                          className="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
+                        >
+                          Continue
+                        </button>
+                      );
+                    }
+                    return null;
+                  })()}
+                  <button
+                    onClick={resetTimer}
+                    disabled={status.saving || !selectedSessionId}
+                    className="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
+                  >
+                    Reset Timer
+                  </button>
+                </div>
+                {countdown !== null && (
+                  <div className="text-3xl font-mono font-bold text-center text-brand mt-4">
+                    {countdown}
+                  </div>
+                )}
+                {(() => {
+                  const session = votingSessions.find((s) => s.id === selectedSessionId);
+                  return session?.timerEnd ? (
+                    <div className="text-sm text-gray-600 text-center">
+                      Timer ends at: {new Date(session.timerEnd).toLocaleString()}
+                    </div>
+                  ) : null;
+                })()}
+              </div>
+              <div className="bg-white rounded-xl p-4 shadow mb-4">
+                <h3 className="font-bold text-lg mb-4">Vote Distribution</h3>
+                {votingResults.results.length > 0 ? (
+                  <div className="space-y-2">
+                    {votingResults.results.map((entry, index) => {
+                      const dellColors = [
+                        '#007DB8',
+                        '#76B900',
+                        '#FF6600',
+                        '#E4002B',
+                        '#8C1D82',
+                        '#00A9F4',
+                        '#FFC107',
+                        '#795548',
+                        '#607D8B',
+                        '#9C27B0'
+                      ];
+                      const percentage = votingResults.totalVotes > 0 
+                        ? ((entry.votes / votingResults.totalVotes) * 100).toFixed(1)
+                        : 0;
+                      return (
+                        <div key={entry.id} className="flex items-center gap-3">
+                          <div 
+                            className="w-4 h-4 rounded"
+                            style={{ backgroundColor: dellColors[index % dellColors.length] }}
+                          />
+                          <div className="flex-1">
+                            <div className="flex justify-between text-sm">
+                              <span>{entry.name}</span>
+                              <span>{entry.votes} votes ({percentage}%)</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                              <div 
+                                className="h-2 rounded-full"
+                                style={{ 
+                                  width: `${percentage}%`,
+                                  backgroundColor: dellColors[index % dellColors.length]
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-gray-500">No votes yet.</p>
+                )}
+              </div>
+              <div className="bg-white rounded-xl p-4 shadow">
+                <h3 className="font-bold text-lg mb-2">Vote Counts</h3>
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-gray-100 text-gray-700">
+                    <tr>
+                      <th className="p-3">Group</th>
+                      <th className="p-3">Votes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {votingResults.results.map((r) => (
+                      <tr key={r.id} className="border-t">
+                        <td className="p-3">{r.name}</td>
+                        <td className="p-3">{r.votes}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="mt-2 text-sm text-gray-600">
+                  Total votes: {votingResults.totalVotes}
+                </div>
+              </div>
+            </>
+          )}
+          <div className="bg-white rounded-xl p-4 shadow mt-4">
+            <h3 className="font-bold text-lg mb-2">Session Summary</h3>
+            <table className="w-full text-sm text-left">
+              <thead className="bg-gray-100 text-gray-700">
+                <tr>
+                  <th className="p-3">Session</th>
+                  <th className="p-3">Total Votes</th>
+                  <th className="p-3">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {votingSessions.map((s) => (
+                  <tr key={s.id} className="border-t">
+                    <td className="p-3">{s.sessionDescription}</td>
+                    <td className="p-3">{s.totalVotes || 0}</td>
+                    <td className="p-3">
+                      {s.remainingMinutes ? 'Paused' :
+                       (!s.timerEnd ? 'Not yet started' : 
+                       (new Date() < new Date(s.timerEnd) ? 'Active' : 'Ended'))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
