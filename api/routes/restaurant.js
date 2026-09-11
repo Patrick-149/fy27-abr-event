@@ -14,24 +14,22 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-router.get('/menu', async (req, res, next) => {
+router.get('/qr', async (req, res, next) => {
   try {
     const data = await readJson('restaurant.json');
-    if (!data.menuFile) {
-      return res.status(404).json({ message: 'No menu uploaded' });
+    if (!data.qrFile) {
+      return res.status(404).json({ message: 'No QR code uploaded' });
     }
-    const filePath = join(process.cwd(), 'uploads', 'menus', data.menuFile);
+    const filePath = join(process.cwd(), 'uploads', 'qrcodes', data.qrFile);
     const file = await readFile(filePath);
-    const ext = data.menuFile.split('.').pop().toLowerCase();
+    const ext = data.qrFile.split('.').pop().toLowerCase();
     const contentType =
-      ext === 'pdf'
-        ? 'application/pdf'
-        : ext === 'xlsx'
-        ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        : ext === 'xls'
-        ? 'application/vnd.ms-excel'
+      ext === 'png'
+        ? 'image/png'
+        : ext === 'jpg' || ext === 'jpeg'
+        ? 'image/jpeg'
         : 'application/octet-stream';
-    res.setHeader('Content-Disposition', `attachment; filename="${data.menuName || 'menu'}"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${data.qrName || 'qrcode'}"`);
     res.setHeader('Content-Type', contentType);
     res.send(file);
   } catch (err) {

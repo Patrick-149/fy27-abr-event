@@ -4,11 +4,10 @@ import EditableList from '../components/EditableList';
 import Loading from '../components/Loading';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
-const TABS = ['schedule', 'restaurant', 'poc', 'groups', 'registrations', 'voting-groups', 'voting-results'];
+const TABS = ['schedule', 'restaurant', 'groups', 'registrations', 'voting-groups', 'voting-results'];
 const TAB_LABELS = {
   schedule: 'Schedule',
   restaurant: 'Restaurant',
-  poc: 'POC Contact',
   groups: 'Groups',
   restrooms: 'Restrooms',
   registrations: 'Registrations',
@@ -50,11 +49,10 @@ export default function AdminDashboardPage() {
     name: '',
     location: '',
     timing: '',
-    menuFile: '',
-    menuName: ''
+    qrFile: '',
+    qrName: ''
   });
   const [restrooms, setRestrooms] = useState([]);
-  const [poc, setPoc] = useState([]);
   const [registrations, setRegistrations] = useState([]);
   const [selectedRegistrationIds, setSelectedRegistrationIds] = useState(new Set());
   const [groups, setGroups] = useState([]);
@@ -70,16 +68,15 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({ saving: false, message: '', error: '' });
   const [uploadFile, setUploadFile] = useState(null);
-  const [menuUploadFile, setMenuUploadFile] = useState(null);
+  const [qrUploadFile, setQrUploadFile] = useState(null);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [s, r, rr, p, g, reg] = await Promise.all([
+        const [s, r, rr, g, reg] = await Promise.all([
           api.get('/api/admin/schedule'),
           api.get('/api/admin/restaurant'),
           api.get('/api/admin/restrooms'),
-          api.get('/api/admin/poc'),
           api.get('/api/admin/groups'),
           api.get('/api/admin/registrations')
         ]);
@@ -88,12 +85,11 @@ export default function AdminDashboardPage() {
           name: '',
           location: '',
           timing: '',
-          menuFile: '',
-          menuName: '',
+          qrFile: '',
+          qrName: '',
           ...r.data
         });
         setRestrooms(rr.data);
-        setPoc(p.data);
         setGroups(g.data);
         setRegistrations(reg.data);
         
@@ -288,18 +284,18 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const uploadMenu = async () => {
-    if (!menuUploadFile) return;
+  const uploadQR = async () => {
+    if (!qrUploadFile) return;
     setStatus({ saving: true, message: '', error: '' });
     try {
       const formData = new FormData();
-      formData.append('menu', menuUploadFile);
-      const { data } = await api.post('/api/admin/restaurant/menu', formData);
-      setRestaurant({ ...restaurant, menuFile: data.menuFile, menuName: data.menuName });
-      setMenuUploadFile(null);
-      setMessage('Menu uploaded successfully.');
+      formData.append('qr', qrUploadFile);
+      const { data } = await api.post('/api/admin/restaurant/qr', formData);
+      setRestaurant({ ...restaurant, qrFile: data.qrFile, qrName: data.qrName });
+      setQrUploadFile(null);
+      setMessage('QR code uploaded successfully.');
     } catch {
-      setStatus({ saving: false, message: '', error: 'Menu upload failed.' });
+      setStatus({ saving: false, message: '', error: 'QR code upload failed.' });
     }
   };
 
@@ -314,10 +310,6 @@ export default function AdminDashboardPage() {
       y: Number(r.y) || 0
     }));
     save('/api/admin/restrooms', payload);
-  };
-
-  const savePoc = () => {
-    save('/api/admin/poc', poc);
   };
 
   const saveGroups = async () => {
@@ -337,7 +329,7 @@ export default function AdminDashboardPage() {
     const used = new Set(groups.map((g) => g.dsp));
     const nextDsp = GROUP_DSPS.find((d) => !used.has(d));
     if (!nextDsp) return;
-    setGroups([...groups, { id: `${Date.now()}`, dsp: nextDsp, group: '' }]);
+    setGroups([...groups, { id: `${Date.now()}`, dsp: nextDsp, group: '', table: '' }]);
   };
 
   const updateGroup = (id, field, value) => {
@@ -728,24 +720,24 @@ export default function AdminDashboardPage() {
             className="w-full border rounded px-3 py-2"
           />
           <div className="space-y-2">
-            <h4 className="font-semibold">Menu</h4>
-            {restaurant.menuName && (
+            <h4 className="font-semibold">QR Code</h4>
+            {restaurant.qrName && (
               <p className="text-sm text-gray-600">
-                Current: <span className="font-medium">{restaurant.menuName}</span>
+                Current: <span className="font-medium">{restaurant.qrName}</span>
               </p>
             )}
             <input
               type="file"
-              onChange={(e) => setMenuUploadFile(e.target.files[0])}
+              onChange={(e) => setQrUploadFile(e.target.files[0])}
               className="block w-full text-sm text-gray-700"
             />
-            {menuUploadFile && <p className="text-sm text-gray-500">{menuUploadFile.name}</p>}
+            {qrUploadFile && <p className="text-sm text-gray-500">{qrUploadFile.name}</p>}
             <button
-              onClick={uploadMenu}
-              disabled={!menuUploadFile || status.saving}
+              onClick={uploadQR}
+              disabled={!qrUploadFile || status.saving}
               className="w-full bg-brand text-white py-2 rounded-lg font-semibold disabled:opacity-50"
             >
-              {status.saving ? 'Uploading...' : 'Upload Menu'}
+              {status.saving ? 'Uploading...' : 'Upload QR Code'}
             </button>
           </div>
           <button
@@ -782,26 +774,7 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {tab === 'poc' && (
-        <div>
-          <EditableList
-            items={poc}
-            onChange={setPoc}
-            fields={[
-              { key: 'category', label: 'Category' },
-              { key: 'name', label: 'Name' },
-              { key: 'phone', label: 'Phone' }
-            ]}
-          />
-          <button
-            onClick={savePoc}
-            disabled={status.saving}
-            className="mt-4 w-full bg-brand text-white py-2 rounded-lg font-semibold disabled:opacity-50"
-          >
-            {status.saving ? 'Saving...' : 'Save POC Contacts'}
-          </button>
-        </div>
-      )}
+
 
       {tab === 'groups' && (
         <div>
@@ -840,6 +813,7 @@ export default function AdminDashboardPage() {
                     </th>
                     <th className="p-3">DSP</th>
                     <th className="p-3">Group</th>
+                    <th className="p-3">Table</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -873,6 +847,14 @@ export default function AdminDashboardPage() {
                           onChange={(e) => updateGroup(g.id, 'group', e.target.value)}
                           className="w-full border rounded px-2 py-1"
                           placeholder="Group"
+                        />
+                      </td>
+                      <td className="p-3">
+                        <input
+                          value={g.table || ''}
+                          onChange={(e) => updateGroup(g.id, 'table', e.target.value)}
+                          className="w-full border rounded px-2 py-1"
+                          placeholder="Table"
                         />
                       </td>
                     </tr>
@@ -927,6 +909,7 @@ export default function AdminDashboardPage() {
                     <th className="p-3">Email</th>
                     <th className="p-3">DSP</th>
                     <th className="p-3">Group</th>
+                    <th className="p-3">Table</th>
                     <th className="p-3">Submitted At</th>
                   </tr>
                 </thead>
@@ -944,6 +927,7 @@ export default function AdminDashboardPage() {
                       <td className="p-3">{r.email}</td>
                       <td className="p-3">{r.dsp}</td>
                       <td className="p-3">{r.group || '-'}</td>
+                      <td className="p-3">{r.table || '-'}</td>
                       <td className="p-3">{new Date(r.createdAt).toLocaleString()}</td>
                     </tr>
                   ))}

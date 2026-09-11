@@ -39,6 +39,9 @@ export default function RegistrationPage() {
       const groupText = data.group
         ? `You belong to group: ${data.group}`
         : 'Your group will be assigned by the admin soon.';
+      const tableText = data.table
+        ? `Please sit at table: ${data.table}`
+        : 'Your table will be assigned by the admin soon.';
       setStatus({
         loading: false,
         error: '',
@@ -46,6 +49,8 @@ export default function RegistrationPage() {
           <>
             Registration submitted successfully!{' '}
             <strong>{groupText}</strong>
+            <br />
+            <strong>{tableText}</strong>
           </>
         )
       });

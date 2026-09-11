@@ -27,12 +27,12 @@ const upload = multer({
   }
 });
 
-const menuUploadDir = join(process.cwd(), 'uploads', 'menus');
-mkdirSync(menuUploadDir, { recursive: true });
+const qrUploadDir = join(process.cwd(), 'uploads', 'qrcodes');
+mkdirSync(qrUploadDir, { recursive: true });
 
-const menuUpload = multer({
+const qrUpload = multer({
   storage: multer.diskStorage({
-    destination: (req, file, cb) => cb(null, menuUploadDir),
+    destination: (req, file, cb) => cb(null, qrUploadDir),
     filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
   })
 });
@@ -83,13 +83,13 @@ router.post('/schedule/upload', authenticate, requireAdmin, upload.single('sched
 router.get('/restaurant', authenticate, requireAdmin, getData('restaurant.json'));
 router.put('/restaurant', authenticate, requireAdmin, putData('restaurant.json'));
 
-router.post('/restaurant/menu', authenticate, requireAdmin, menuUpload.single('menu'), async (req, res, next) => {
+router.post('/restaurant/qr', authenticate, requireAdmin, qrUpload.single('qr'), async (req, res, next) => {
   try {
     const restaurant = await readJson('restaurant.json');
-    restaurant.menuFile = req.file.filename;
-    restaurant.menuName = req.file.originalname;
+    restaurant.qrFile = req.file.filename;
+    restaurant.qrName = req.file.originalname;
     await writeJson('restaurant.json', restaurant);
-    res.json({ success: true, menuFile: req.file.filename, menuName: req.file.originalname });
+    res.json({ success: true, qrFile: req.file.filename, qrName: req.file.originalname });
   } catch (err) {
     next(err);
   }
@@ -97,9 +97,6 @@ router.post('/restaurant/menu', authenticate, requireAdmin, menuUpload.single('m
 
 router.get('/restrooms', authenticate, requireAdmin, getData('restrooms.json'));
 router.put('/restrooms', authenticate, requireAdmin, putData('restrooms.json'));
-
-router.get('/poc', authenticate, requireAdmin, getData('poc.json'));
-router.put('/poc', authenticate, requireAdmin, putData('poc.json'));
 
 router.get('/registrations', authenticate, requireAdmin, async (req, res, next) => {
   try {
@@ -111,6 +108,7 @@ router.get('/registrations', authenticate, requireAdmin, async (req, res, next) 
       email: r.email,
       dsp: r.dsp,
       group: r.group || '',
+      table: r.table || '',
       createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt
     })));
   } catch (err) {
@@ -126,6 +124,7 @@ router.get('/registrations/export', authenticate, requireAdmin, async (req, res,
       'Email': r.email,
       'DSP': r.dsp,
       'Group': r.group || '',
+      'Table': r.table || '',
       'Submitted At': r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt
     }));
     const worksheet = xlsx.utils.json_to_sheet(rows);
@@ -146,7 +145,8 @@ router.get('/groups', authenticate, requireAdmin, async (req, res, next) => {
     res.json(groups.map((g) => ({
       id: g._id.toString(),
       dsp: g.dsp,
-      group: g.group
+      group: g.group,
+      table: g.table || ''
     })));
   } catch (err) {
     next(err);
@@ -162,21 +162,22 @@ router.put('/groups', authenticate, requireAdmin, async (req, res, next) => {
     for (const item of valid) {
       const dsp = item.dsp.trim();
       const group = item.group.trim();
+      const table = item.table ? item.table.trim() : '';
       await collection.updateOne(
         { dsp },
-        { $set: { group } },
+        { $set: { group, table } },
         { upsert: true }
       );
       await registrationsCollection.updateMany(
         { dsp },
-        { $set: { group } }
+        { $set: { group, table } }
       );
     }
     const dspSet = new Set(valid.map((item) => item.dsp.trim()));
     await collection.deleteMany({ dsp: { $nin: [...dspSet] } });
     await registrationsCollection.updateMany(
       { dsp: { $nin: [...dspSet] } },
-      { $set: { group: '' } }
+      { $set: { group: '', table: '' } }
     );
     res.json({ success: true });
   } catch (err) {
@@ -212,7 +213,7 @@ router.delete('/groups', authenticate, requireAdmin, async (req, res, next) => {
     if (dspSet.size > 0) {
       await getRegistrationsCollection().updateMany(
         { dsp: { $in: [...dspSet] } },
-        { $set: { group: '' } }
+        { $set: { group: '', table: '' } }
       );
     }
     res.json({ success: true });

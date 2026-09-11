@@ -12,9 +12,10 @@ router.post('/', async (req, res, next) => {
     const collection = getRegistrationsCollection();
     const groupDoc = await getGroupsCollection().findOne({ dsp });
     const group = groupDoc?.group || '';
-    const entry = { fullName, email: email.trim().toLowerCase(), dsp, group, createdAt: new Date() };
+    const table = groupDoc?.table || '';
+    const entry = { fullName, email: email.trim().toLowerCase(), dsp, group, table, createdAt: new Date() };
     const { insertedId } = await collection.insertOne(entry);
-    res.status(201).json({ success: true, id: insertedId.toString(), group });
+    res.status(201).json({ success: true, id: insertedId.toString(), group, table });
   } catch (err) {
     next(err);
   }

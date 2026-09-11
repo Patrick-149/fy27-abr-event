@@ -15,20 +15,20 @@ export default function RestaurantPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const downloadMenu = async () => {
+  const downloadQR = async () => {
     try {
-      const response = await api.get('/api/restaurant/menu', { responseType: 'blob' });
+      const response = await api.get('/api/restaurant/qr', { responseType: 'blob' });
       const blob = new Blob([response.data], { type: response.data.type || 'application/octet-stream' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', data.menuName || 'menu');
+      link.setAttribute('download', data.qrName || 'qrcode');
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch {
-      setError('Could not download menu.');
+      setError('Could not download QR code.');
     }
   };
 
@@ -49,14 +49,14 @@ export default function RestaurantPage() {
         </p>
       </div>
       <button
-        onClick={downloadMenu}
-        disabled={!data.menuFile}
+        onClick={downloadQR}
+        disabled={!data.qrFile}
         className="mt-6 w-full bg-brand text-white py-2.5 rounded-lg font-semibold disabled:opacity-50"
       >
-        Download Menu
+        Download QR Code
       </button>
-      {!data.menuFile && (
-        <p className="text-sm text-gray-500 mt-2">Menu will be available once uploaded.</p>
+      {!data.qrFile && (
+        <p className="text-sm text-gray-500 mt-2">QR code will be available once uploaded.</p>
       )}
     </div>
   );
