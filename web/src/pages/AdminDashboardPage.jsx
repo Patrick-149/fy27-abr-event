@@ -535,6 +535,8 @@ export default function AdminDashboardPage() {
       await api.post(`/api/admin/voting-sessions/${selectedSessionId}/reset`);
       const { data: sessions } = await api.get('/api/admin/voting-sessions');
       setVotingSessions(sessions);
+      // Clear the vote distribution area
+      setVotingResults({ results: [], timerEnd: null, totalVotes: 0 });
       setTimerDuration('');
       setCountdown(null);
       setStatus({ saving: false, message: 'Votes reset.', error: '' });
