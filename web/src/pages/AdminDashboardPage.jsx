@@ -30,22 +30,41 @@ function TabButton({ active, onClick, label }) {
 export default function AdminDashboardPage() {
   const [tab, setTab] = useState('schedule');
   const [schedule, setSchedule] = useState([]);
+  const [restaurant, setRestaurant] = useState({
+    name: '',
+    location: '',
+    timing: '',
+    qrFile: '',
+    qrName: ''
+  });
+  const [qrUploadFile, setQrUploadFile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({ saving: false, message: '', error: '' });
 
   useEffect(() => {
-    const loadSchedule = async () => {
+    const loadData = async () => {
       try {
-        const { data } = await api.get('/api/admin/schedule');
-        setSchedule(data);
+        const [s, r] = await Promise.all([
+          api.get('/api/admin/schedule'),
+          api.get('/api/admin/restaurant')
+        ]);
+        setSchedule(s.data);
+        setRestaurant({
+          name: '',
+          location: '',
+          timing: '',
+          qrFile: '',
+          qrName: '',
+          ...r.data
+        });
       } catch (err) {
-        console.error('Failed to load schedule:', err);
-        setStatus({ saving: false, message: '', error: 'Failed to load schedule' });
+        console.error('Failed to load data:', err);
+        setStatus({ saving: false, message: '', error: 'Failed to load data' });
       } finally {
         setLoading(false);
       }
     };
-    loadSchedule();
+    loadData();
   }, []);
 
   const saveSchedule = async () => {
@@ -53,6 +72,32 @@ export default function AdminDashboardPage() {
     try {
       await api.put('/api/admin/schedule', schedule);
       setStatus({ saving: false, message: 'Saved successfully.', error: '' });
+    } catch {
+      setStatus({ saving: false, message: '', error: 'Save failed.' });
+    }
+  };
+
+  const uploadQR = async () => {
+    if (!qrUploadFile) return;
+    setStatus({ saving: true, message: '', error: '' });
+    try {
+      const formData = new FormData();
+      formData.append('qr', qrUploadFile);
+      const { data } = await api.post('/api/admin/restaurant/qr', formData);
+      setRestaurant({ ...restaurant, qrFile: data.qrFile, qrName: data.qrName });
+      setQrUploadFile(null);
+      setStatus({ saving: false, message: 'QR code uploaded successfully.', error: '' });
+    } catch {
+      setStatus({ saving: false, message: '', error: 'QR code upload failed.' });
+    }
+  };
+
+  const saveRestaurant = () => {
+    setStatus({ saving: true, message: '', error: '' });
+    try {
+      api.put('/api/admin/restaurant', restaurant).then(() => {
+        setStatus({ saving: false, message: 'Saved successfully.', error: '' });
+      });
     } catch {
       setStatus({ saving: false, message: '', error: 'Save failed.' });
     }
@@ -144,9 +189,54 @@ export default function AdminDashboardPage() {
       )}
 
       {tab === 'restaurant' && (
-        <div className="bg-white rounded-xl p-4 shadow">
-          <h3 className="font-bold text-lg mb-2">Restaurant</h3>
-          <p className="text-gray-600">Restaurant management will be added here.</p>
+        <div className="bg-white rounded-xl p-4 shadow space-y-3">
+          <h3 className="font-bold text-lg">Restaurant Details</h3>
+          <input
+            value={restaurant.name}
+            onChange={(e) => setRestaurant({ ...restaurant, name: e.target.value })}
+            placeholder="Name"
+            className="w-full border rounded px-3 py-2"
+          />
+          <input
+            value={restaurant.location}
+            onChange={(e) => setRestaurant({ ...restaurant, location: e.target.value })}
+            placeholder="Location"
+            className="w-full border rounded px-3 py-2"
+          />
+          <input
+            value={restaurant.timing}
+            onChange={(e) => setRestaurant({ ...restaurant, timing: e.target.value })}
+            placeholder="Timing"
+            className="w-full border rounded px-3 py-2"
+          />
+          <div className="space-y-2">
+            <h4 className="font-semibold">QR Code</h4>
+            {restaurant.qrName && (
+              <p className="text-sm text-gray-600">
+                Current: <span className="font-medium">{restaurant.qrName}</span>
+              </p>
+            )}
+            <input
+              type="file"
+              onChange={(e) => setQrUploadFile(e.target.files[0])}
+              className="block w-full text-sm text-gray-700"
+            />
+            {qrUploadFile && <p className="text-sm text-gray-500">{qrUploadFile.name}</p>}
+            <button
+              onClick={uploadQR}
+              disabled={!qrUploadFile || status.saving}
+              className="w-full bg-brand text-white py-2 rounded-lg font-semibold disabled:opacity-50"
+            >
+              {status.saving ? 'Uploading...' : 'Upload QR Code'}
+            </button>
+          </div>
+          <button
+            onClick={saveRestaurant}
+            disabled={status.saving}
+            className="w-full bg-brand text-white py-2 rounded-lg font-semibold disabled:opacity-50"
+          >
+            {status.saving ? 'Saving...' : 'Save Restaurant'}
+          </button>
         </div>
       )}
 
