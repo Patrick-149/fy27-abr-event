@@ -47,7 +47,8 @@ export default function RegistrationPage() {
         error: '',
         success: (
           <>
-            Registration submitted successfully!{' '}
+            Registration submitted successfully!
+            <br />
             <strong>{groupText}</strong>
             <br />
             <strong>{tableText}</strong>
