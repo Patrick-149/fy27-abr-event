@@ -1,69 +1,9 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
   plugins: [
-    react(),
-    VitePWA({
-      registerType: 'autoUpdate',
-      injectRegister: 'script',
-      includeAssets: ['icons/*.png', 'floor-plan.svg'],
-      manifest: {
-        name: 'FY27 ABR',
-        short_name: 'Event Details',
-        description: 'FY27 ABR event details, schedule, and registration',
-        theme_color: '#2563eb',
-        background_color: '#ffffff',
-        display: 'standalone',
-        scope: '/',
-        start_url: '/',
-        version: '3.0.0',
-        icons: [
-          {
-            src: '/icons/icon-192x192.png',
-            sizes: '192x192',
-            type: 'image/png'
-          },
-          {
-            src: '/icons/icon-512x512.png',
-            sizes: '512x512',
-            type: 'image/png'
-          },
-          {
-            src: '/icons/maskable-icon-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'maskable'
-          }
-        ]
-      },
-      workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff,woff2}'],
-        runtimeCaching: [
-          {
-            urlPattern: /^\/api\/.*/,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              networkTimeoutSeconds: 10,
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60
-              }
-            }
-          }
-        ],
-        clientsClaim: true,
-        skipWaiting: true,
-        cleanupOutdatedCaches: true,
-        // Force cache busting
-        cacheId: 'fy27-abr-v3'
-      },
-      devOptions: {
-        enabled: false
-      }
-    })
+    react()
   ],
   server: {
     port: 5173,
@@ -76,7 +16,6 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    // Force rebuild by changing cache busting
     rollupOptions: {
       output: {
         manualChunks: undefined
