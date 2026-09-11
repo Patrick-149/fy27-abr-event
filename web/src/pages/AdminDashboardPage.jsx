@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import api from '../api';
 
 const TABS = ['schedule', 'restaurant', 'groups', 'registrations', 'voting-groups', 'voting-results'];
 const TAB_LABELS = {
@@ -28,10 +29,46 @@ function TabButton({ active, onClick, label }) {
 
 export default function AdminDashboardPage() {
   const [tab, setTab] = useState('schedule');
+  const [schedule, setSchedule] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState({ saving: false, message: '', error: '' });
+
+  useEffect(() => {
+    const loadSchedule = async () => {
+      try {
+        const { data } = await api.get('/api/admin/schedule');
+        setSchedule(data);
+      } catch (err) {
+        console.error('Failed to load schedule:', err);
+        setStatus({ saving: false, message: '', error: 'Failed to load schedule' });
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadSchedule();
+  }, []);
+
+  const saveSchedule = async () => {
+    setStatus({ saving: true, message: '', error: '' });
+    try {
+      await api.put('/api/admin/schedule', schedule);
+      setStatus({ saving: false, message: 'Saved successfully.', error: '' });
+    } catch {
+      setStatus({ saving: false, message: '', error: 'Save failed.' });
+    }
+  };
+
+  if (loading) return <div className="text-center p-8">Loading...</div>;
 
   return (
     <div>
       <h2 className="text-2xl font-bold text-gray-900 mb-4">Admin Dashboard</h2>
+      {status.error && (
+        <div className="mb-3 text-red-600 bg-red-50 p-2 rounded">{status.error}</div>
+      )}
+      {status.message && (
+        <div className="mb-3 text-green-700 bg-green-50 p-2 rounded">{status.message}</div>
+      )}
       <div className="flex gap-2 overflow-x-auto mb-4">
         {TABS.map((t) => (
           <TabButton
@@ -44,9 +81,65 @@ export default function AdminDashboardPage() {
       </div>
 
       {tab === 'schedule' && (
-        <div className="bg-white rounded-xl p-4 shadow">
-          <h3 className="font-bold text-lg mb-2">Schedule</h3>
-          <p className="text-gray-600">Schedule management will be added here.</p>
+        <div className="space-y-4">
+          <div className="bg-white rounded-xl p-4 shadow">
+            <h3 className="font-bold text-lg mb-2">Schedule</h3>
+            {schedule.length === 0 ? (
+              <p className="text-gray-500">No schedule items yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {schedule.map((item, index) => (
+                  <div key={index} className="border rounded p-3">
+                    <div className="grid grid-cols-3 gap-2 text-sm">
+                      <input
+                        value={item.duration}
+                        onChange={(e) => {
+                          const updated = [...schedule];
+                          updated[index] = { ...updated[index], duration: e.target.value };
+                          setSchedule(updated);
+                        }}
+                        className="border rounded px-2 py-1"
+                        placeholder="Duration"
+                      />
+                      <input
+                        value={item.topic}
+                        onChange={(e) => {
+                          const updated = [...schedule];
+                          updated[index] = { ...updated[index], topic: e.target.value };
+                          setSchedule(updated);
+                        }}
+                        className="border rounded px-2 py-1"
+                        placeholder="Topic"
+                      />
+                      <input
+                        value={item.presenter}
+                        onChange={(e) => {
+                          const updated = [...schedule];
+                          updated[index] = { ...updated[index], presenter: e.target.value };
+                          setSchedule(updated);
+                        }}
+                        className="border rounded px-2 py-1"
+                        placeholder="Presenter"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button
+              onClick={() => setSchedule([...schedule, { duration: '', topic: '', presenter: '' }])}
+              className="mt-3 bg-brand text-white px-4 py-2 rounded-lg font-semibold"
+            >
+              Add Item
+            </button>
+          </div>
+          <button
+            onClick={saveSchedule}
+            disabled={status.saving}
+            className="w-full bg-brand text-white py-2 rounded-lg font-semibold disabled:opacity-50"
+          >
+            {status.saving ? 'Saving...' : 'Save Schedule'}
+          </button>
         </div>
       )}
 
