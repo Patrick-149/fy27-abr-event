@@ -8,11 +8,20 @@ export default function VotingPage() {
   const [selectedGroupId, setSelectedGroupId] = useState('');
   const [status, setStatus] = useState({ loading: false, error: '', success: '' });
   const autoRefreshIntervalRef = useRef(null);
+  const previousTimerEndRef = useRef(null);
 
   useEffect(() => {
     const load = async () => {
       try {
         const { data } = await api.get('/api/voting/config');
+        
+        // Check if timer has been reset (timerEnd went from having a value to null)
+        if (previousTimerEndRef.current && !data.timerEnd) {
+          // Clear notification messages when timer is reset
+          setStatus({ loading: false, error: '', success: '' });
+        }
+        
+        previousTimerEndRef.current = data.timerEnd;
         setConfig(data);
       } catch {
         setStatus({ loading: false, error: 'Failed to load voting config.', success: '' });
