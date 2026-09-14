@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { mkdirSync } from 'fs';
+import { mkdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import multer from 'multer';
 import xlsx from 'xlsx';
@@ -125,8 +125,14 @@ router.post('/restaurant/qr', authenticate, requireAdmin, qrUpload.single('qr'),
   try {
     const collection = getRestaurantCollection();
     const existing = await collection.findOne({});
+    
+    // Read file and convert to base64
+    const fileData = readFileSync(req.file.path);
+    const base64Data = fileData.toString('base64');
+    const mimeType = req.file.mimetype;
+    
     const updateData = {
-      qrFile: req.file.filename,
+      qrFile: `data:${mimeType};base64,${base64Data}`,
       qrName: req.file.originalname
     };
     
@@ -144,7 +150,7 @@ router.post('/restaurant/qr', authenticate, requireAdmin, qrUpload.single('qr'),
       });
     }
     
-    res.json({ success: true, qrFile: req.file.filename, qrName: req.file.originalname });
+    res.json({ success: true, qrFile: updateData.qrFile, qrName: req.file.originalname });
   } catch (err) {
     next(err);
   }
