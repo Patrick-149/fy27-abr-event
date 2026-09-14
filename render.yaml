@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: fy27-abr-event-api
+    env: node
+    buildCommand: cd api && npm install
+    startCommand: cd api && node server.js
+    envVars:
+      - key: MONGODB_URI
+        sync: false
+      - key: WEB_URL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+
+crons:
+  - name: keep-alive
+    schedule: "*/10 * * * *"
+    command: node scripts/keep-alive.js
+    envVars:
+      - key: APP_URL
+        sync: false
