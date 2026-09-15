@@ -18,7 +18,8 @@ router.post('/', async (req, res, next) => {
       return res.status(409).json({ message: 'This email address has already been registered.' });
     }
     
-    const groupDoc = await getGroupsCollection().findOne({ dsp });
+    // Look up group and table by email instead of DSP
+    const groupDoc = await getGroupsCollection().findOne({ email: normalizedEmail });
     const group = groupDoc?.group || '';
     const table = groupDoc?.table || '';
     const entry = { fullName, email: normalizedEmail, dsp, group, table, createdAt: new Date() };

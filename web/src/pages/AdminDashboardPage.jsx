@@ -11,18 +11,6 @@ const TAB_LABELS = {
   'voting-groups': 'Voting Groups',
   'voting-results': 'Voting Results'
 };
-const GROUP_DSPS = [
-  '1000Fix',
-  'Inbox',
-  'Softlogic',
-  'CTC',
-  'Digipro',
-  'NCR',
-  'SOG',
-  'Getronics',
-  'SVOA',
-  'ISS'
-].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 
 function TabButton({ active, onClick, label }) {
   return (
@@ -256,19 +244,11 @@ export default function AdminDashboardPage() {
   };
 
   const addGroup = () => {
-    const used = new Set(groups.map((g) => g.dsp));
-    const nextDsp = GROUP_DSPS.find((d) => !used.has(d));
-    if (!nextDsp) return;
-    setGroups([...groups, { id: `${Date.now()}`, dsp: nextDsp, group: '', table: '' }]);
+    setGroups([...groups, { id: `${Date.now()}`, email: '', group: '', table: '' }]);
   };
 
   const updateGroup = (id, field, value) => {
     setGroups(groups.map((g) => (g.id === id ? { ...g, [field]: value } : g)));
-  };
-
-  const availableDsps = (id) => {
-    const used = new Set(groups.filter((g) => g.id !== id).map((g) => g.dsp));
-    return GROUP_DSPS.filter((d) => !used.has(d));
   };
 
   const toggleGroup = (id) => {
@@ -737,15 +717,15 @@ export default function AdminDashboardPage() {
       {tab === 'groups' && (
         <div>
           <p className="text-sm text-gray-600 mb-2">
-            Assign a group to each DSP. Registrations will show the group that matches their DSP.
+            Assign a group and table to each email address. Registrations will show the group and table that matches their email.
           </p>
           <div className="flex gap-2 mb-3">
             <button
               onClick={addGroup}
-              disabled={status.saving || !GROUP_DSPS.some((d) => !groups.some((g) => g.dsp === d))}
+              disabled={status.saving}
               className="bg-brand text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
             >
-              Add DSP
+              Add Email
             </button>
             <button
               onClick={removeSelectedGroups}
@@ -769,7 +749,7 @@ export default function AdminDashboardPage() {
                         onChange={toggleAllGroups}
                       />
                     </th>
-                    <th className="p-3">DSP</th>
+                    <th className="p-3">Email</th>
                     <th className="p-3">Group</th>
                     <th className="p-3">Table</th>
                   </tr>
@@ -785,19 +765,13 @@ export default function AdminDashboardPage() {
                         />
                       </td>
                       <td className="p-3">
-                        <select
-                          value={g.dsp}
-                          onChange={(e) => updateGroup(g.id, 'dsp', e.target.value)}
-                          className="w-full border rounded px-2 py-1 bg-white"
-                        >
-                          {(() => {
-                            const options = availableDsps(g.id);
-                            if (g.dsp && !options.includes(g.dsp)) options.unshift(g.dsp);
-                            return options.map((d) => (
-                              <option key={d} value={d}>{d}</option>
-                            ));
-                          })()}
-                        </select>
+                        <input
+                          value={g.email || ''}
+                          onChange={(e) => updateGroup(g.id, 'email', e.target.value)}
+                          className="w-full border rounded px-2 py-1"
+                          placeholder="email@example.com"
+                          type="email"
+                        />
                       </td>
                       <td className="p-3">
                         <input

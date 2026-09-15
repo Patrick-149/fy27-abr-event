@@ -205,7 +205,7 @@ router.get('/groups', authenticate, requireAdmin, async (req, res, next) => {
     const groups = await getGroupsCollection().find().toArray();
     res.json(groups.map((g) => ({
       id: g._id.toString(),
-      dsp: g.dsp,
+      email: g.email,
       group: g.group,
       table: g.table || ''
     })));
@@ -217,27 +217,27 @@ router.get('/groups', authenticate, requireAdmin, async (req, res, next) => {
 router.put('/groups', authenticate, requireAdmin, async (req, res, next) => {
   try {
     const items = Array.isArray(req.body) ? req.body : [req.body];
-    const valid = items.filter((item) => item.dsp && item.group);
+    const valid = items.filter((item) => item.email && item.group);
     const collection = getGroupsCollection();
     const registrationsCollection = getRegistrationsCollection();
     for (const item of valid) {
-      const dsp = item.dsp.trim();
+      const email = item.email.trim().toLowerCase();
       const group = item.group.trim();
       const table = item.table ? item.table.trim() : '';
       await collection.updateOne(
-        { dsp },
+        { email },
         { $set: { group, table } },
         { upsert: true }
       );
       await registrationsCollection.updateMany(
-        { dsp },
+        { email: { $regex: new RegExp(`^${email}$`, 'i') } },
         { $set: { group, table } }
       );
     }
-    const dspSet = new Set(valid.map((item) => item.dsp.trim()));
-    await collection.deleteMany({ dsp: { $nin: [...dspSet] } });
+    const emailSet = new Set(valid.map((item) => item.email.trim().toLowerCase()));
+    await collection.deleteMany({ email: { $nin: [...emailSet] } });
     await registrationsCollection.updateMany(
-      { dsp: { $nin: [...dspSet] } },
+      { email: { $nin: [...emailSet] } },
       { $set: { group: '', table: '' } }
     );
     res.json({ success: true });
