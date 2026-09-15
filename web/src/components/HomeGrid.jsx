@@ -7,6 +7,7 @@ export default function HomeGrid() {
       <NavButton to="/registration" label="Registration Form" />
       <NavButton to="/restaurant" label="Dinner Restaurant" />
       <NavButton to="/voting" label="Voting" />
+      <NavButton to="/check-registration" label="Check Registration" />
     </div>
   );
 }

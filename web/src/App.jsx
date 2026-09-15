@@ -11,6 +11,7 @@ import RegistrationPage from './pages/RegistrationPage';
 import RestaurantPage from './pages/RestaurantPage';
 import RestroomMapPage from './pages/RestroomMapPage';
 import VotingPage from './pages/VotingPage';
+import CheckRegistrationPage from './pages/CheckRegistrationPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
 
 export default function App() {
@@ -26,6 +27,7 @@ export default function App() {
           <Route path="/restaurant" element={<RestaurantPage />} />
           <Route path="/restrooms" element={<RestroomMapPage />} />
           <Route path="/voting" element={<VotingPage />} />
+          <Route path="/check-registration" element={<CheckRegistrationPage />} />
           <Route element={<AdminRoute />}>
             <Route path="/admin" element={<AdminDashboardPage />} />
           </Route>
