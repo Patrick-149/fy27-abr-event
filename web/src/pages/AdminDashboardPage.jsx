@@ -962,9 +962,8 @@ export default function AdminDashboardPage() {
                           <input
                             value={g.name}
                             onChange={(e) => updateSessionGroup(selectedSessionId, g.id, 'name', e.target.value)}
-                            className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-colors"
+                            className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm"
                             placeholder="Group name"
-                            autoComplete="off"
                           />
                           <button
                             onClick={() => removeSessionGroup(selectedSessionId, g.id)}
