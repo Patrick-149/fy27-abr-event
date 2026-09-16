@@ -51,6 +51,7 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({ saving: false, message: '', error: '' });
   const votingResultsAutoRefreshRef = useRef(null);
+  const [localSessionGroups, setLocalSessionGroups] = useState([]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -101,6 +102,16 @@ export default function AdminDashboardPage() {
       loadResults();
     }
   }, [tab, selectedSessionId]);
+
+  // Sync local session groups with selected session
+  useEffect(() => {
+    if (selectedSessionId) {
+      const session = votingSessions.find((s) => s.id === selectedSessionId);
+      if (session) {
+        setLocalSessionGroups(session.groups || []);
+      }
+    }
+  }, [selectedSessionId, votingSessions]);
 
   // Auto-refresh voting results only when timer is active (within timer duration)
   useEffect(() => {
@@ -390,23 +401,43 @@ export default function AdminDashboardPage() {
   };
 
   const addSessionGroup = (sessionId) => {
-    const session = votingSessions.find((s) => s.id === sessionId);
-    if (!session) return;
-    const updatedGroups = [...(session.groups || []), { id: `${Date.now()}`, name: '', description: '' }];
-    updateVotingSession(sessionId, { groups: updatedGroups });
+    const newGroup = { id: `${Date.now()}`, name: '', description: '' };
+    setLocalSessionGroups([...localSessionGroups, newGroup]);
+    // Save immediately when adding a new group
+    updateVotingSession(sessionId, { groups: [...localSessionGroups, newGroup] });
   };
 
   const updateSessionGroup = (sessionId, groupId, field, value) => {
-    const session = votingSessions.find((s) => s.id === sessionId);
-    if (!session) return;
-    const updatedGroups = session.groups.map((g) => (g.id === groupId ? { ...g, [field]: value } : g));
-    updateVotingSession(sessionId, { groups: updatedGroups });
+    // Update local state immediately for smooth typing
+    const updatedGroups = localSessionGroups.map((g) => (g.id === groupId ? { ...g, [field]: value } : g));
+    setLocalSessionGroups(updatedGroups);
+  };
+
+  // Debounced save function to save to API after user stops typing
+  const saveSessionGroupsDebounced = useRef(null);
+  const saveSessionGroups = () => {
+    if (!selectedSessionId) return;
+    
+    // Clear any existing timeout
+    if (saveSessionGroupsDebounced.current) {
+      clearTimeout(saveSessionGroupsDebounced.current);
+    }
+    
+    // Set new timeout to save after 1 second of no typing
+    saveSessionGroupsDebounced.current = setTimeout(async () => {
+      try {
+        await updateVotingSession(selectedSessionId, { groups: localSessionGroups });
+        setStatus({ saving: false, message: 'Groups saved.', error: '' });
+      } catch {
+        setStatus({ saving: false, message: '', error: 'Failed to save groups.' });
+      }
+    }, 1000);
   };
 
   const removeSessionGroup = (sessionId, groupId) => {
-    const session = votingSessions.find((s) => s.id === sessionId);
-    if (!session) return;
-    const updatedGroups = session.groups.filter((g) => g.id !== groupId);
+    const updatedGroups = localSessionGroups.filter((g) => g.id !== groupId);
+    setLocalSessionGroups(updatedGroups);
+    // Save immediately when removing a group
     updateVotingSession(sessionId, { groups: updatedGroups });
   };
 
@@ -952,16 +983,16 @@ export default function AdminDashboardPage() {
                 </select>
               </div>
               {(() => {
-                const session = votingSessions.find((s) => s.id === selectedSessionId);
-                if (!session) return null;
+                if (!selectedSessionId) return null;
                 return (
                   <>
-                    {session.groups.map((g) => (
+                    {localSessionGroups.map((g) => (
                       <div key={g.id} className="border rounded-lg p-3">
                         <div className="flex gap-2 items-center">
                           <input
                             value={g.name}
                             onChange={(e) => updateSessionGroup(selectedSessionId, g.id, 'name', e.target.value)}
+                            onBlur={saveSessionGroups}
                             className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm"
                             placeholder="Group name"
                           />
