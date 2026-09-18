@@ -52,7 +52,6 @@ export default function AdminDashboardPage() {
   const [status, setStatus] = useState({ saving: false, message: '', error: '' });
   const votingResultsAutoRefreshRef = useRef(null);
   const [localSessionGroups, setLocalSessionGroups] = useState([]);
-  const [registrationImportFile, setRegistrationImportFile] = useState(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -343,21 +342,6 @@ export default function AdminDashboardPage() {
       window.URL.revokeObjectURL(url);
     } catch {
       setStatus({ saving: false, message: '', error: 'Download failed.' });
-    }
-  };
-
-  const importRegistrations = async () => {
-    if (!registrationImportFile) return;
-    setStatus({ saving: true, message: '', error: '' });
-    try {
-      const formData = new FormData();
-      formData.append('registrations', registrationImportFile);
-      const { data } = await api.post('/api/admin/registrations/import', formData);
-      setRegistrations(data);
-      setRegistrationImportFile(null);
-      setStatus({ saving: false, message: `Imported ${data.length} registrations successfully.`, error: '' });
-    } catch {
-      setStatus({ saving: false, message: '', error: 'Import failed. Make sure the file is a valid Excel with Full Name and Email columns.' });
     }
   };
 
@@ -875,26 +859,6 @@ export default function AdminDashboardPage() {
               className="bg-brand text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
             >
               Download Excel
-            </button>
-          </div>
-          <div className="bg-white rounded-xl p-4 shadow mb-4">
-            <h3 className="font-bold text-lg mb-2">Import Registrations from CSV/Excel</h3>
-            <p className="text-sm text-gray-600 mb-2">
-              Upload a CSV or Excel file with Full Name and Email columns. DSP, Group, and Table will be left blank.
-            </p>
-            <input
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              onChange={(e) => setRegistrationImportFile(e.target.files[0])}
-              className="block w-full text-sm text-gray-700 mb-2"
-            />
-            {registrationImportFile && <p className="text-sm text-gray-500 mb-2">{registrationImportFile.name}</p>}
-            <button
-              onClick={importRegistrations}
-              disabled={!registrationImportFile || status.saving}
-              className="w-full bg-brand text-white py-2 rounded-lg font-semibold disabled:opacity-50"
-            >
-              {status.saving ? 'Importing...' : 'Import File'}
             </button>
           </div>
           <div className="bg-white rounded-xl shadow overflow-hidden">
