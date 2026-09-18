@@ -260,6 +260,70 @@ router.delete('/registrations', authenticate, requireAdmin, async (req, res, nex
   }
 });
 
+const registrationUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, uploadDir),
+    filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
+  }),
+  fileFilter: (req, file, cb) => {
+    const allowed = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel'
+    ];
+    cb(null, allowed.includes(file.mimetype));
+  }
+});
+
+router.post('/registrations/import', authenticate, requireAdmin, registrationUpload.single('registrations'), async (req, res, next) => {
+  try {
+    const workbook = xlsx.readFile(req.file.path);
+    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
+    
+    const collection = getRegistrationsCollection();
+    const imported = [];
+    
+    for (const row of rows) {
+      const fullName = row['Full Name'] || row['fullName'] || '';
+      const email = row['Email'] || row['email'] || '';
+      const dsp = row['DSP'] || row['dsp'] || '';
+      
+      if (!fullName || !email) {
+        continue; // Skip rows without required fields
+      }
+      
+      const normalizedEmail = email.trim().toLowerCase();
+      
+      // Check if email already exists
+      const existing = await collection.findOne({ email: normalizedEmail });
+      if (existing) {
+        continue; // Skip duplicate emails
+      }
+      
+      // Look up group and table by email
+      const groupDoc = await getGroupsCollection().findOne({ email: normalizedEmail });
+      const group = groupDoc?.group || '';
+      const table = groupDoc?.table || '';
+      
+      const entry = {
+        fullName,
+        email: normalizedEmail,
+        dsp,
+        group,
+        table,
+        createdAt: new Date()
+      };
+      
+      const { insertedId } = await collection.insertOne(entry);
+      imported.push({ ...entry, id: insertedId.toString() });
+    }
+    
+    res.json(imported);
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.delete('/groups', authenticate, requireAdmin, async (req, res, next) => {
   try {
     const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
