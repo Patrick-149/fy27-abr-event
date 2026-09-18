@@ -42,6 +42,14 @@ export default function AdminDashboardPage() {
   const [selectedGroupIds, setSelectedGroupIds] = useState(new Set());
   const [registrations, setRegistrations] = useState([]);
   const [selectedRegistrationIds, setSelectedRegistrationIds] = useState(new Set());
+  const [showAddRegistration, setShowAddRegistration] = useState(false);
+  const [newRegistration, setNewRegistration] = useState({
+    fullName: '',
+    email: '',
+    dsp: '',
+    group: '',
+    table: ''
+  });
   const [votingSessions, setVotingSessions] = useState([]);
   const [selectedSessionId, setSelectedSessionId] = useState(null);
   const [votingResults, setVotingResults] = useState({ results: [], timerEnd: null, totalVotes: 0 });
@@ -351,6 +359,25 @@ export default function AdminDashboardPage() {
       setRegistrations(data);
     } catch (err) {
       console.error('Failed to load registrations:', err);
+    }
+  };
+
+  const addManualRegistration = async () => {
+    if (!newRegistration.fullName || !newRegistration.email) {
+      setStatus({ saving: false, message: '', error: 'Full Name and Email are required' });
+      return;
+    }
+    
+    setStatus({ saving: true, message: '', error: '' });
+    try {
+      const { data } = await api.post('/api/admin/registrations', newRegistration);
+      setRegistrations([data.registration, ...registrations]);
+      setNewRegistration({ fullName: '', email: '', dsp: '', group: '', table: '' });
+      setShowAddRegistration(false);
+      setStatus({ saving: false, message: 'Registration added successfully.', error: '' });
+    } catch (err) {
+      const errorMessage = err.response?.data?.message || 'Failed to add registration';
+      setStatus({ saving: false, message: '', error: errorMessage });
     }
   };
 
@@ -838,29 +865,120 @@ export default function AdminDashboardPage() {
 
       {tab === 'registrations' && (
         <div>
-          <div className="flex justify-end gap-2 mb-3">
+          <div className="flex justify-between items-center mb-3">
             <button
-              onClick={refreshRegistrations}
+              onClick={() => setShowAddRegistration(!showAddRegistration)}
               disabled={status.saving}
               className="bg-brand text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
             >
-              Refresh
+              {showAddRegistration ? 'Cancel' : 'Add Registration'}
             </button>
-            <button
-              onClick={removeSelectedRegistrations}
-              disabled={status.saving || selectedRegistrationIds.size === 0}
-              className="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
-            >
-              Remove Selected
-            </button>
-            <button
-              onClick={downloadRegistrations}
-              disabled={status.saving || registrations.length === 0}
-              className="bg-brand text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
-            >
-              Download Excel
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={refreshRegistrations}
+                disabled={status.saving}
+                className="bg-brand text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
+              >
+                Refresh
+              </button>
+              <button
+                onClick={removeSelectedRegistrations}
+                disabled={status.saving || selectedRegistrationIds.size === 0}
+                className="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
+              >
+                Remove Selected
+              </button>
+              <button
+                onClick={downloadRegistrations}
+                disabled={status.saving || registrations.length === 0}
+                className="bg-brand text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
+              >
+                Download Excel
+              </button>
+            </div>
           </div>
+          
+          {showAddRegistration && (
+            <div className="bg-white rounded-xl p-4 shadow mb-4 space-y-3">
+              <h3 className="font-bold text-lg">Add Manual Registration</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Full Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    value={newRegistration.fullName}
+                    onChange={(e) => setNewRegistration({ ...newRegistration, fullName: e.target.value })}
+                    className="w-full border rounded px-3 py-2"
+                    placeholder="John Doe"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    value={newRegistration.email}
+                    onChange={(e) => setNewRegistration({ ...newRegistration, email: e.target.value })}
+                    className="w-full border rounded px-3 py-2"
+                    placeholder="john@example.com"
+                    type="email"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    DSP (optional)
+                  </label>
+                  <input
+                    value={newRegistration.dsp}
+                    onChange={(e) => setNewRegistration({ ...newRegistration, dsp: e.target.value })}
+                    className="w-full border rounded px-3 py-2"
+                    placeholder="DSP Name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Group (optional)
+                  </label>
+                  <input
+                    value={newRegistration.group}
+                    onChange={(e) => setNewRegistration({ ...newRegistration, group: e.target.value })}
+                    className="w-full border rounded px-3 py-2"
+                    placeholder="Group Name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Table (optional)
+                  </label>
+                  <input
+                    value={newRegistration.table}
+                    onChange={(e) => setNewRegistration({ ...newRegistration, table: e.target.value })}
+                    className="w-full border rounded px-3 py-2"
+                    placeholder="Table Number"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={addManualRegistration}
+                  disabled={status.saving || !newRegistration.fullName || !newRegistration.email}
+                  className="bg-brand text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
+                >
+                  {status.saving ? 'Adding...' : 'Add Registration'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowAddRegistration(false);
+                    setNewRegistration({ fullName: '', email: '', dsp: '', group: '', table: '' });
+                  }}
+                  className="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg font-semibold"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
           <div className="bg-white rounded-xl shadow overflow-hidden">
             {registrations.length === 0 ? (
               <p className="p-4 text-gray-500">No registrations yet.</p>

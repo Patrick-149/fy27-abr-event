@@ -5,6 +5,7 @@ import FormInput from '../components/FormInput';
 const DSPS = [
   '1000Fix',
   'CTC',
+  'Dell',
   'Digipro',
   'Getronics',
   'Inbox',

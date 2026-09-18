@@ -177,6 +177,46 @@ router.get('/registrations', authenticate, requireAdmin, async (req, res, next) 
   }
 });
 
+router.post('/registrations', authenticate, requireAdmin, async (req, res, next) => {
+  try {
+    const { fullName, email, dsp, group, table } = req.body || {};
+    
+    // Validate required fields
+    if (!fullName || !email) {
+      return res.status(400).json({ message: 'Full Name and Email are required' });
+    }
+    
+    // Check if email already exists
+    const collection = getRegistrationsCollection();
+    const existing = await collection.findOne({ email: email.trim().toLowerCase() });
+    if (existing) {
+      return res.status(400).json({ message: 'Email already registered' });
+    }
+    
+    const registration = {
+      fullName: fullName.trim(),
+      email: email.trim().toLowerCase(),
+      dsp: dsp || '',
+      group: group || '',
+      table: table || '',
+      createdAt: new Date()
+    };
+    
+    const { insertedId } = await collection.insertOne(registration);
+    res.json({ 
+      success: true, 
+      id: insertedId.toString(),
+      registration: {
+        id: insertedId.toString(),
+        ...registration,
+        createdAt: registration.createdAt.toISOString()
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/registrations/export', authenticate, requireAdmin, async (req, res, next) => {
   try {
     const collection = getRegistrationsCollection();
