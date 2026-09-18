@@ -878,13 +878,13 @@ export default function AdminDashboardPage() {
             </button>
           </div>
           <div className="bg-white rounded-xl p-4 shadow mb-4">
-            <h3 className="font-bold text-lg mb-2">Import Registrations from Excel</h3>
+            <h3 className="font-bold text-lg mb-2">Import Registrations from CSV/Excel</h3>
             <p className="text-sm text-gray-600 mb-2">
-              Upload an Excel file with Full Name and Email columns. DSP, Group, and Table will be left blank.
+              Upload a CSV or Excel file with Full Name and Email columns. DSP, Group, and Table will be left blank.
             </p>
             <input
               type="file"
-              accept=".xlsx,.xls"
+              accept=".xlsx,.xls,.csv"
               onChange={(e) => setRegistrationImportFile(e.target.files[0])}
               className="block w-full text-sm text-gray-700 mb-2"
             />
@@ -894,7 +894,7 @@ export default function AdminDashboardPage() {
               disabled={!registrationImportFile || status.saving}
               className="w-full bg-brand text-white py-2 rounded-lg font-semibold disabled:opacity-50"
             >
-              {status.saving ? 'Importing...' : 'Import Excel'}
+              {status.saving ? 'Importing...' : 'Import File'}
             </button>
           </div>
           <div className="bg-white rounded-xl shadow overflow-hidden">

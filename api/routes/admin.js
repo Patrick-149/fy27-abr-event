@@ -268,7 +268,9 @@ const registrationUpload = multer({
   fileFilter: (req, file, cb) => {
     const allowed = [
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/vnd.ms-excel'
+      'application/vnd.ms-excel',
+      'text/csv',
+      'application/csv'
     ];
     cb(null, allowed.includes(file.mimetype));
   }
@@ -276,46 +278,100 @@ const registrationUpload = multer({
 
 router.post('/registrations/import', authenticate, requireAdmin, registrationUpload.single('registrations'), async (req, res, next) => {
   try {
-    const workbook = xlsx.readFile(req.file.path);
-    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-    const rows = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
-    
     const collection = getRegistrationsCollection();
     const imported = [];
     
-    for (const row of rows) {
-      const fullName = row['Full Name'] || row['fullName'] || '';
-      const email = row['Email'] || row['email'] || '';
-      const dsp = row['DSP'] || row['dsp'] || '';
+    // Check if file is CSV or Excel
+    const isCsv = req.file.mimetype === 'text/csv' || req.file.mimetype === 'application/csv' || req.file.originalname.endsWith('.csv');
+    
+    if (isCsv) {
+      // Process CSV file
+      const fs = await import('fs');
+      const csvContent = fs.readFileSync(req.file.path, 'utf-8');
+      const lines = csvContent.split('\n').filter(line => line.trim());
       
-      if (!fullName || !email) {
-        continue; // Skip rows without required fields
+      // Skip header row
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        
+        // Parse CSV line (handle quoted values)
+        const parts = line.split(',').map(part => part.trim().replace(/^"|"$/g, ''));
+        
+        if (parts.length < 2) continue;
+        
+        const fullName = parts[0];
+        const email = parts[1];
+        
+        if (!fullName || !email) {
+          continue; // Skip rows without required fields
+        }
+        
+        const normalizedEmail = email.trim().toLowerCase();
+        
+        // Check if email already exists
+        const existing = await collection.findOne({ email: normalizedEmail });
+        if (existing) {
+          continue; // Skip duplicate emails
+        }
+        
+        // Look up group and table by email
+        const groupDoc = await getGroupsCollection().findOne({ email: normalizedEmail });
+        const group = groupDoc?.group || '';
+        const table = groupDoc?.table || '';
+        
+        const entry = {
+          fullName,
+          email: normalizedEmail,
+          dsp: '',
+          group,
+          table,
+          createdAt: new Date()
+        };
+        
+        const { insertedId } = await collection.insertOne(entry);
+        imported.push({ ...entry, id: insertedId.toString() });
       }
+    } else {
+      // Process Excel file
+      const workbook = xlsx.readFile(req.file.path);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
       
-      const normalizedEmail = email.trim().toLowerCase();
-      
-      // Check if email already exists
-      const existing = await collection.findOne({ email: normalizedEmail });
-      if (existing) {
-        continue; // Skip duplicate emails
+      for (const row of rows) {
+        const fullName = row['Full Name'] || row['fullName'] || '';
+        const email = row['Email'] || row['email'] || '';
+        const dsp = row['DSP'] || row['dsp'] || '';
+        
+        if (!fullName || !email) {
+          continue; // Skip rows without required fields
+        }
+        
+        const normalizedEmail = email.trim().toLowerCase();
+        
+        // Check if email already exists
+        const existing = await collection.findOne({ email: normalizedEmail });
+        if (existing) {
+          continue; // Skip duplicate emails
+        }
+        
+        // Look up group and table by email
+        const groupDoc = await getGroupsCollection().findOne({ email: normalizedEmail });
+        const group = groupDoc?.group || '';
+        const table = groupDoc?.table || '';
+        
+        const entry = {
+          fullName,
+          email: normalizedEmail,
+          dsp,
+          group,
+          table,
+          createdAt: new Date()
+        };
+        
+        const { insertedId } = await collection.insertOne(entry);
+        imported.push({ ...entry, id: insertedId.toString() });
       }
-      
-      // Look up group and table by email
-      const groupDoc = await getGroupsCollection().findOne({ email: normalizedEmail });
-      const group = groupDoc?.group || '';
-      const table = groupDoc?.table || '';
-      
-      const entry = {
-        fullName,
-        email: normalizedEmail,
-        dsp,
-        group,
-        table,
-        createdAt: new Date()
-      };
-      
-      const { insertedId } = await collection.insertOne(entry);
-      imported.push({ ...entry, id: insertedId.toString() });
     }
     
     res.json(imported);
